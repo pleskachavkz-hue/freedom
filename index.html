@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Чат без сервера (Firebase)</title>
+  <!-- 1. Подключаем официальный SDK Firebase из облака -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+</head>
+<body style="font-family: sans-serif; max-width: 500px; margin: 20px auto;">
+
+  <h2>Облачный Бессерверный Чат</h2>
+  <div id="box" style="height: 300px; border: 1px solid #ccc; overflow-y: scroll; padding: 10px; margin-bottom: 10px;"></div>
+  
+  <input type="text" id="input" placeholder="Сообщение..." style="width: 70%; padding: 5px;">
+  <button id="send" style="padding: 5px 10px;">Послать</button>
+
+  <script>
+    // 2. Твои ключи доступа к бесплатному проекту Firebase
+    // (Их ты получаешь бесплатно при создании проекта в консоли Firebase)
+    const firebaseConfig = {
+      databaseURL: "https://freedom-9cedb-default-rtdb.firebaseio.com/" 
+    };
+
+    // Инициализируем базу данных
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database().ref("chat_messages");
+
+    // 3. Спрашиваем имя
+    const username = prompt('Представьтесь:') || 'Аноним';
+    const box = document.getElementById('box');
+    const input = document.getElementById('input');
+
+    // 4. СЛУШАЕМ ОБЛАКО: Как только в базе появляется новая запись, Firebase сам пришлет её сюда
+    db.limitToLast(50).on('child_added', (snapshot) => {
+      const data = snapshot.val();
+      box.innerHTML += `<div><strong>${data.name}:</strong> ${data.text}</div>`;
+      box.scrollTop = box.scrollHeight; // автоскролл
+    });
+
+    // 5. ОТПРАВЛЯЕМ В ОБЛАКО: Просто пушим объект в базу данных Google
+    function send() {
+      if (!input.value.trim()) return;
+      
+      db.push({
+        name: username,
+        text: input.value,
+        timestamp: Date.now()
+      });
+      
+      input.value = '';
+    }
+
+    document.getElementById('send').onclick = send;
+    input.onkeydown = (e) => { if (e.key === 'Enter') send(); };
+  </script>
+
+</body>
+</html>
