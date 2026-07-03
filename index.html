@@ -1,200 +1,262 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ru">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Freedom Chat</title>
-  <!-- Подключаем Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Freedom Chat</title>
+    <!-- Подключаем Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, sans-serif;
-      background: #0f1117;
-      color: #e8eaed;
-      height: 100dvh;
-      display: flex;
-      flex-direction: column;
-    }
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1rem 1.25rem;
-      border-bottom: 1px solid #2a2f3a;
-      background: #151922;
-    }
-    header h1 { margin: 0; font-size: 1.1rem; font-weight: 600; }
-    #messages {
-      flex: 1;
-      overflow-y: auto;
-      padding: 1rem 1.25rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-    }
-    .message {
-      max-width: min(75%, 520px);
-      padding: 0.65rem 0.85rem;
-      border-radius: 12px;
-      line-height: 1.4;
-      word-break: break-word;
-    }
-    .message.other { align-self: flex-start; background: #1e2430; }
-    .message.own { align-self: flex-end; background: #2563eb; }
-    .message-meta { font-size: 0.75rem; opacity: 0.75; margin-bottom: 0.25rem; }
-    #composer {
-      display: flex;
-      gap: 0.5rem;
-      padding: 1rem 1.25rem;
-      border-top: 1px solid #2a2f3a;
-      background: #151922;
-    }
-    #message-input {
-      flex: 1;
-      padding: 0.75rem 0.9rem;
-      border: 1px solid #2a2f3a;
-      border-radius: 10px;
-      background: #0f1117;
-      color: #e8eaed;
-      font: inherit;
-    }
-    #message-input:focus { outline: 2px solid #2563eb; outline-offset: 1px; }
-    button {
-      padding: 0.75rem 1rem;
-      border: none;
-      border-radius: 10px;
-      background: #2563eb;
-      color: white;
-      font: inherit;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    #overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.65);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-      z-index: 10;
-    }
-    #overlay.hidden { display: none; }
-    .modal {
-      width: min(100%, 360px);
-      background: #151922;
-      border: 1px solid #2a2f3a;
-      border-radius: 14px;
-      padding: 1.25rem;
-    }
-    .modal h2 { margin: 0 0 0.75rem; font-size: 1.1rem; }
-    #username-input {
-      width: 100%;
-      padding: 0.75rem 0.9rem;
-      border: 1px solid #2a2f3a;
-      border-radius: 10px;
-      background: #0f1117;
-      color: #e8eaed;
-      font: inherit;
-      margin-bottom: 0.75rem;
-    }
-  </style>
-</head>
-<body>
-
-  <!-- Окно авторизации -->
-  <div id="overlay">
-    <div class="modal">
-      <h2>Добро пожаловать в Freedom</h2>
-      <input type="text" id="username-input" placeholder="Ваше имя..." autocomplete="off">
-      <button id="login-btn" style="width: 100%;">Войти в чат</button>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family:
+          system-ui,
+          -apple-system,
+          sans-serif;
+        background: #0f1117;
+        color: #e8eaed;
+        height: 100dvh;
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid #2a2f3a;
+        background: #151922;
+      }
+      header h1 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+      }
+      #messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .message {
+        max-width: min(75%, 520px);
+        padding: 0.65rem 0.85rem;
+        border-radius: 12px;
+        line-height: 1.4;
+        word-break: break-word;
+      }
+      .message.other {
+        align-self: flex-start;
+        background: #1e2430;
+      }
+      .message.own {
+        align-self: flex-end;
+        background: #2563eb;
+      }
+      .message-meta {
+        font-size: 0.75rem;
+        opacity: 0.75;
+        margin-bottom: 0.25rem;
+      }
+      #composer {
+        display: flex;
+        gap: 0.5rem;
+        padding: 1rem 1.25rem;
+        border-top: 1px solid #2a2f3a;
+        background: #151922;
+      }
+      #message-input {
+        flex: 1;
+        padding: 0.75rem 0.9rem;
+        border: 1px solid #2a2f3a;
+        border-radius: 10px;
+        background: #0f1117;
+        color: #e8eaed;
+        font: inherit;
+      }
+      #message-input:focus {
+        outline: 2px solid #2563eb;
+        outline-offset: 1px;
+      }
+      button {
+        padding: 0.75rem 1rem;
+        border: none;
+        border-radius: 10px;
+        background: #2563eb;
+        color: white;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      #overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.65);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        z-index: 10;
+      }
+      #overlay.hidden {
+        display: none;
+      }
+      .modal {
+        width: min(100%, 360px);
+        background: #151922;
+        border: 1px solid #2a2f3a;
+        border-radius: 14px;
+        padding: 1.25rem;
+      }
+      .modal h2 {
+        margin: 0 0 0.75rem;
+        font-size: 1.1rem;
+      }
+      #username-input {
+        width: 100%;
+        padding: 0.75rem 0.9rem;
+        border: 1px solid #2a2f3a;
+        border-radius: 10px;
+        background: #0f1117;
+        color: #e8eaed;
+        font: inherit;
+        margin-bottom: 0.75rem;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Окно авторизации -->
+    <div id="overlay">
+      <div class="modal">
+        <h2>Добро пожаловать в Freedom</h2>
+        <input
+          type="text"
+          id="username-input"
+          placeholder="Ваше имя..."
+          autocomplete="off"
+        />
+        <button id="login-btn" style="width: 100%">Войти в чат</button>
+      </div>
     </div>
-  </div>
 
-  <!-- Основной интерфейс чата -->
-  <header>
-    <h1>Freedom Chat</h1>
-  </header>
+    <!-- Основной интерфейс чата -->
+    <header>
+      <h1>Freedom Chat</h1>
+    </header>
 
-  <div id="messages"></div>
-  
-  <div id="composer">
-    <input type="text" id="message-input" placeholder="Сообщение..." disabled>
-    <button id="send" disabled>Послать</button>
-  </div>
+    <div id="messages"></div>
 
-  <script>
-    // Конфигурация твоей базы данных Firebase
-    const firebaseConfig = {
-      databaseURL: "https://freedom-9cedb-default-rtdb.firebaseio.com/" 
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database().ref("chat_messages");
+    <div id="composer">
+      <input
+        type="text"
+        id="message-input"
+        placeholder="Сообщение..."
+        disabled
+      />
+      <button id="send" disabled>Послать</button>
+    </div>
 
-    let username = '';
+    <script>
+      // Конфигурация твоей базы данных Firebase
+      const firebaseConfig = {
+        databaseURL: "https://freedom-9cedb-default-rtdb.firebaseio.com/",
+      };
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.database().ref("chat_messages");
 
-    const overlay = document.getElementById('overlay');
-    const usernameInput = document.getElementById('username-input');
-    const loginBtn = document.getElementById('login-btn');
-    const messagesBox = document.getElementById('messages');
-    const messageInput = document.getElementById('message-input');
-    const sendBtn = document.getElementById('send');
+      let username = "";
 
-    // Логика входа
-    function joinChat() {
-      username = usernameInput.value.trim() || 'Аноним';
-      overlay.classList.add('hidden'); // прячем модалку
-      messageInput.disabled = false;    // активируем инпут
-      sendBtn.disabled = false;         // активируем кнопку
-      messageInput.focus();
-    }
+      const overlay = document.getElementById("overlay");
+      const usernameInput = document.getElementById("username-input");
+      const loginBtn = document.getElementById("login-btn");
+      const messagesBox = document.getElementById("messages");
+      const messageInput = document.getElementById("message-input");
+      const sendBtn = document.getElementById("send");
 
-    loginBtn.onclick = joinChat;
-    usernameInput.onkeydown = (e) => { if (e.key === 'Enter') joinChat(); };
+      // Логика входа
+      function joinChat() {
+        username = usernameInput.value.trim() || "Аноним";
+        overlay.classList.add("hidden"); // прячем модалку
+        messageInput.disabled = false; // активируем инпут
+        sendBtn.disabled = false; // активируем кнопку
+        messageInput.focus();
+      }
 
-    // СЛУШАЕМ ОБЛАКО
-    db.limitToLast(50).on('child_added', (snapshot) => {
+      loginBtn.onclick = joinChat;
+      usernameInput.onkeydown = (e) => {
+        if (e.key === "Enter") joinChat();
+      };
+
+      // Переменная для отслеживания даты последнего сообщения
+      let lastMessageDateString = "";
+
+      // СЛУШАЕМ ОБЛАКО
+      db.limitToLast(50).on("child_added", (snapshot) => {
         const data = snapshot.val();
-        
-        // Форматируем время (например, "14:32")
-        let timeString = '';
+
+        let timeString = "";
+        let dateString = "";
+
         if (data.timestamp) {
-            const date = new Date(data.timestamp);
-            timeString = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+          const date = new Date(data.timestamp);
+          // Форматируем время (ЧЧ:ММ)
+          timeString = date.toLocaleTimeString("ru-RU", {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+          // Форматируем дату (например, "3 июля 2026 г." или просто "3 июля")
+          dateString = date.toLocaleDateString("ru-RU", {
+            day: "numeric",
+            month: "long",
+          });
+        }
+
+        // Если дата этого сообщения отличается от предыдущего, добавляем разделитель дня
+        if (dateString && dateString !== lastMessageDateString) {
+          messagesBox.innerHTML += `
+                <div style="text-align: center; margin: 1.5rem 0 0.5rem; font-size: 0.8rem; opacity: 0.4; width: 100%;">
+                    — ${dateString} —
+                </div>
+            `;
+          lastMessageDateString = dateString; // Запоминаем новую дату
         }
 
         // Определяем класс: если имя совпадает с текущим пользователем — own (синий), иначе — other (серый)
-        const messageClass = data.name === username ? 'own' : 'other';
-        
+        const messageClass = data.name === username ? "own" : "other";
+
         messagesBox.innerHTML += `
             <div class="message ${messageClass}">
-                <div class="message-meta">${data.name} ${timeString ? `<span style="opacity: 0.5; margin-left: 5px;">${timeString}</span>` : ''}</div>
+                <div class="message-meta">${data.name} ${timeString ? `<span style="opacity: 0.5; margin-left: 5px;">${timeString}</span>` : ""}</div>
                 <div>${data.text}</div>
             </div>
         `;
         messagesBox.scrollTop = messagesBox.scrollHeight;
-    });
-
-    // ОТПРАВЛЯЕМ В ОБЛАКО
-    function send() {
-      if (!messageInput.value.trim()) return;
-      
-      db.push({
-        name: username,
-        text: messageInput.value,
-        timestamp: Date.now()
       });
-      
-      messageInput.value = '';
-    }
 
-    sendBtn.onclick = send;
-    messageInput.onkeydown = (e) => { if (e.key === 'Enter') send(); };
-  </script>
+      // ОТПРАВЛЯЕМ В ОБЛАКО
+      function send() {
+        if (!messageInput.value.trim()) return;
 
-</body>
+        db.push({
+          name: username,
+          text: messageInput.value,
+          timestamp: Date.now(),
+        });
+
+        messageInput.value = "";
+      }
+
+      sendBtn.onclick = send;
+      messageInput.onkeydown = (e) => {
+        if (e.key === "Enter") send();
+      };
+    </script>
+  </body>
 </html>
