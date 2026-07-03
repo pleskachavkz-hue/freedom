@@ -158,18 +158,25 @@
 
     // СЛУШАЕМ ОБЛАКО
     db.limitToLast(50).on('child_added', (snapshot) => {
-      const data = snapshot.val();
-      
-      // Определяем класс: если имя совпадает с текущим пользователем — own (синий), иначе — other (серый)
-      const messageClass = data.name === username ? 'own' : 'other';
+        const data = snapshot.val();
+        
+        // Форматируем время (например, "14:32")
+        let timeString = '';
+        if (data.timestamp) {
+            const date = new Date(data.timestamp);
+            timeString = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        }
 
-      messagesBox.innerHTML += `
-        <div class="message ${messageClass}">
-          <div class="message-meta">${data.name}</div>
-          <div>${data.text}</div>
-        </div>
-      `;
-      messagesBox.scrollTop = messagesBox.scrollHeight;
+        // Определяем класс: если имя совпадает с текущим пользователем — own (синий), иначе — other (серый)
+        const messageClass = data.name === username ? 'own' : 'other';
+        
+        messagesBox.innerHTML += `
+            <div class="message ${messageClass}">
+                <div class="message-meta">${data.name} ${timeString ? `<span style="opacity: 0.5; margin-left: 5px;">${timeString}</span>` : ''}</div>
+                <div>${data.text}</div>
+            </div>
+        `;
+        messagesBox.scrollTop = messagesBox.scrollHeight;
     });
 
     // ОТПРАВЛЯЕМ В ОБЛАКО
