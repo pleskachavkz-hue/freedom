@@ -62,6 +62,23 @@
             color: #30d158;
             font-weight: 500;
         }
+        #header-buttons {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        #clear-history-button {
+            background: none;
+            border: none;
+            color: #ecc94b;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: opacity 0.2s;
+        }
+        #clear-history-button:hover {
+            opacity: 0.7;
+        }
         #logout-button {
             background: none;
             border: none;
@@ -79,7 +96,7 @@
             background: #1a1a1c;
             padding: 8px 15px;
             border-bottom: 1px solid #2c2c2e;
-            display: none; /* Покажется после авторизации */
+            display: none;
         }
         #search-input {
             width: 100%;
@@ -237,7 +254,10 @@
                 <span id="current-user-display">Загрузка...</span>
                 <span id="online-count">онлайн: 0</span>
             </div>
-            <button id="logout-button">Выйти</button>
+            <div id="header-buttons">
+                <button id="clear-history-button">Очистить</button>
+                <button id="logout-button">Выйти</button>
+            </div>
         </div>
 
         <!-- Поиск по истории -->
@@ -278,6 +298,7 @@
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
         const logoutButton = document.getElementById('logout-button');
+        const clearHistoryButton = document.getElementById('clear-history-button');
         const authOverlay = document.getElementById('auth-overlay');
         const usernameInput = document.getElementById('username-input');
         const loginButton = document.getElementById('login-button');
@@ -289,7 +310,7 @@
         let username = localStorage.getItem('chat_username');
         let lastMessageDateString = '';
         let typingTimeout;
-        let localMessagesCache = []; // Хранилище для мгновенного локального поиска
+        let localMessagesCache = [];
 
         // --- ПРОВЕРКА АВТОРИЗАЦИИ ---
         function checkAuth() {
@@ -342,6 +363,27 @@
             setTimeout(() => { location.reload(); }, 500);
         });
 
+        // --- ОЧИСТКА ИСТОРИИ ПО ПАРОЛЮ ---
+        clearHistoryButton.addEventListener('click', () => {
+            const password = prompt('Введите пароль администратора для очистки истории:');
+            if (password === '1029') {
+                if (confirm('Вы уверены, что хотите полностью стереть историю сообщений?')) {
+                    db.remove()
+                        .then(() => {
+                            messagesBox.innerHTML = '';
+                            localMessagesCache = [];
+                            lastMessageDateString = '';
+                            sendSystemMessage('Администратор очистил историю чата');
+                        })
+                        .catch((error) => {
+                            alert('Ошибка при очистке: ' + error.message);
+                        });
+                }
+            } else if (password !== null) {
+                alert('Неверный пароль!');
+            }
+        });
+
         // --- ФУНКЦИЯ ОТПРАВКИ СООБЩЕНИЯ ---
         function sendMessage() {
             const text = messageInput.value.trim();
@@ -375,20 +417,18 @@
             }, 2500);
         });
 
-        // --- СИСТЕМА ОНЛАЙН СТАТУСА (PRESENCE) ---
+        // --- СИСТЕМА ОНЛАЙН СТАТУСА ---
         function initOnlinePresence() {
             const amOnlineRef = firebase.database().ref('.info/connected');
             
             amOnlineRef.on('value', (snapshot) => {
                 if (snapshot.val() === true) {
                     const userStatusRef = onlineRef.child(username);
-                    // Когда юзер отключится (закроет вкладку) — автоматически удалить его из базы
                     userStatusRef.onDisconnect().remove();
                     userStatusRef.set(true);
                 }
             });
 
-            // Слушаем общее количество людей онлайн
             onlineRef.on('value', (snapshot) => {
                 const totalOnline = snapshot.numChildren();
                 onlineCountSpan.innerText = `онлайн: ${totalOnline}`;
@@ -403,7 +443,6 @@
                 const element = document.getElementById(item.id);
                 if (!element) return;
 
-                // Если системное сообщение — ищем по тексту, иначе по автору и тексту
                 const matches = item.isSystem 
                     ? item.text.toLowerCase().includes(query)
                     : item.text.toLowerCase().includes(query) || item.name.toLowerCase().includes(query);
@@ -411,14 +450,13 @@
                 if (matches) {
                     element.style.display = '';
                 } else {
-                    element.style.display = 'none'; // Скрываем неподходящие под фильтр
+                    element.style.display = 'none';
                 }
             });
         });
 
         // --- ИНИЦИАЛИЗАЦИЯ СЛУШАТЕЛЕЙ FIREBASE ---
         function initChatListeners() {
-            // Слушаем, кто сейчас печатает
             typingRef.on('value', (snapshot) => {
                 const typingUsers = snapshot.val() || {};
                 const activeTypers = Object.keys(typingUsers).filter(name => name !== username && typingUsers[name] === true);
@@ -433,7 +471,15 @@
                 }
             });
 
-            // История последних 50 сообщений
+            // Слушаем удаление всей базы извне
+            db.on('value', (snapshot) => {
+                if (!snapshot.exists()) {
+                    messagesBox.innerHTML = '';
+                    localMessagesCache = [];
+                    lastMessageDateString = '';
+                }
+            });
+
             db.limitToLast(50).on('child_added', (snapshot) => {
                 const messageId = snapshot.key;
                 const data = snapshot.val();
@@ -449,7 +495,6 @@
                     if (dateString === todayString) isToday = true;
                 }
 
-                // Кэшируем для последующего поиска
                 localMessagesCache.push({
                     id: data.isSystem ? `sys-${messageId}` : `msg-${messageId}`,
                     name: data.name || '',
@@ -457,12 +502,10 @@
                     isSystem: !!data.isSystem
                 });
 
-                // Отметка о прочтении
                 if (!data.isSystem && data.name !== username && (!data.views || !data.views[username])) {
                     db.child(messageId).child('views').child(username).set(true);
                 }
 
-                // Разделитель дат
                 if (dateString && dateString !== lastMessageDateString) {
                     messagesBox.innerHTML += `
                         <div style="text-align: center; margin: 1.5rem 0 0.5rem; font-size: 0.8rem; opacity: 0.4; width: 100%;">
@@ -472,7 +515,6 @@
                     lastMessageDateString = dateString;
                 }
 
-                // Отрисовка
                 if (data.isSystem) {
                     messagesBox.innerHTML += `
                         <div id="sys-${messageId}" style="text-align: center; margin: 0.5rem 0; font-size: 0.85rem; opacity: 0.6; font-style: italic; width: 100%; color: #007aff;">
@@ -496,13 +538,11 @@
                     `;
                 }
 
-                // Автоматический скролл вниз, только если пользователь не ищет что-то в данный момент
                 if (!searchInput.value.trim()) {
                     messagesBox.scrollTop = messagesBox.scrollHeight;
                 }
             });
 
-            // Слушаем изменения галочек
             db.limitToLast(50).on('child_changed', (snapshot) => {
                 const messageId = snapshot.key;
                 const data = snapshot.val();
