@@ -7,6 +7,8 @@
     <!-- Подключаем Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <!-- Google Fonts для Material-вида -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         * {
             box-sizing: border-box;
@@ -14,15 +16,15 @@
             padding: 0;
         }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #0a0a0a;
-            color: #fff;
+            font-family: 'Roboto', sans-serif;
+            background-color: #141218; /* Глубокий темный Material M3 */
+            color: #e6e1e5;
             display: flex;
             flex-direction: column;
             height: 100vh;
-            padding: 10px;
+            padding: 16px;
         }
-        /* Контейнер чата со скруглёнными краями */
+        /* Контейнер чата в стиле Material Surface */
         #chat-container {
             display: flex;
             flex-direction: column;
@@ -30,111 +32,115 @@
             max-width: 600px;
             width: 100%;
             margin: 0 auto;
-            background: #1e1e1e;
+            background: #1d1b20; /* Панель M3 Surface */
             position: relative;
             overflow: hidden;
-            border-radius: 24px;
-            border: 1px solid #2c2c2e;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            border-radius: 28px; /* Material M3 */
+            box-shadow: 0 4px 30px rgba(0,0,0,0.3);
         }
         /* Шапка чата */
         #chat-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 14px 20px;
-            background: #111;
-            border-bottom: 1px solid #2c2c2e;
-            font-size: 0.95rem;
+            padding: 16px 24px;
+            background: #25232a; /* Чуть светлее для выделения */
+            border-bottom: 1px solid #35333a;
             z-index: 2;
         }
         #header-info {
             display: flex;
             flex-direction: column;
-            gap: 2px;
+            gap: 4px;
         }
         #current-user-display {
-            font-weight: 600;
+            font-weight: 500;
             color: #fff;
+            font-size: 1.05rem;
         }
         #online-count {
-            font-size: 0.75rem;
-            color: #30d158;
+            font-size: 0.8rem;
+            color: #a8dadc; /* Мягкий пастельный оттенок для онлайна */
             font-weight: 500;
         }
         #header-buttons {
             display: flex;
-            gap: 15px;
+            gap: 16px;
             align-items: center;
         }
         #clear-history-button {
             background: none;
             border: none;
-            color: #ecc94b;
+            color: #e6c229; /* Спокойный золотистый */
             cursor: pointer;
             font-size: 0.9rem;
             font-weight: 500;
             transition: opacity 0.2s;
-        }
-        #clear-history-button:hover {
-            opacity: 0.7;
         }
         #logout-button {
             background: none;
             border: none;
-            color: #ff453a;
+            color: #f28482; /* Мягкий коралловый вместо агрессивного красного */
             cursor: pointer;
             font-size: 0.9rem;
             font-weight: 500;
             transition: opacity 0.2s;
         }
-        #logout-button:hover {
-            opacity: 0.7;
+        #clear-history-button:hover, #logout-button:hover {
+            opacity: 0.8;
         }
         /* Панель поиска */
         #search-bar {
-            background: #1a1a1c;
-            padding: 8px 15px;
-            border-bottom: 1px solid #2c2c2e;
+            background: #25232a;
+            padding: 12px 24px;
+            border-bottom: 1px solid #35333a;
             display: none;
         }
         #search-input {
             width: 100%;
-            padding: 8px 14px;
-            border-radius: 10px;
-            border: none;
-            background: #2c2c2e;
+            padding: 10px 16px;
+            border-radius: 12px;
+            border: 1px solid #49454f;
+            background: #2d2b32;
             color: #fff;
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             outline: none;
+            transition: border-color 0.2s;
+        }
+        #search-input:focus {
+            border-color: #93c5fd; /* Спокойный голубой акцент */
         }
         /* Область сообщений */
         #messages {
             flex: 1;
             overflow-y: auto;
-            padding: 20px;
+            padding: 24px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
         }
         .message {
             max-width: 75%;
-            padding: 10px 14px;
-            border-radius: 16px;
+            padding: 12px 16px;
             font-size: 0.95rem;
             line-height: 1.4;
             word-break: break-word;
             position: relative;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
         }
+        /* Ваши сообщения: приглушенный серо-синий тон */
         .message.own {
-            background-color: #007aff;
+            background-color: #384358;
+            color: #e3ebf8;
             align-self: flex-end;
-            border-bottom-right-radius: 4px;
+            border-radius: 20px 20px 4px 20px;
         }
+        /* Чужие сообщения: нейтральный мягкий графит */
         .message.other {
-            background-color: #2c2c2e;
+            background-color: #2a282f;
+            color: #e6e1e5;
             align-self: flex-start;
-            border-bottom-left-radius: 4px;
+            border-radius: 20px 20px 20px 4px;
         }
         .message-meta {
             font-size: 0.75rem;
@@ -142,53 +148,88 @@
             margin-bottom: 4px;
             display: flex;
             justify-content: space-between;
-            gap: 10px;
+            gap: 12px;
+            font-weight: 500;
+        }
+        .message.own .message-meta {
+            color: #adc6ff; /* Пастельный контрастный цвет для имени */
+        }
+        .message.other .message-meta {
+            color: #cac4d0;
+        }
+        /* Даты и системные сообщения (вынесены из JS) */
+        .date-divider {
+            text-align: center;
+            margin: 1.5rem 0 0.5rem;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #938f99;
+            width: 100%;
+        }
+        .system-msg {
+            text-align: center;
+            margin: 0.5rem 0;
+            font-size: 0.85rem;
+            font-style: italic;
+            width: 100%;
+            color: #625b71; /* Очень спокойный, не отвлекающий цвет */
         }
         /* Панель ввода */
         #bottom-bar {
             position: relative;
-            background: #111;
-            padding: 15px 15px 22px 15px;
-            border-top: 1px solid #2c2c2e;
+            background: #25232a;
+            padding: 16px 24px 24px 24px;
+            border-top: 1px solid #35333a;
         }
         #input-container {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             position: relative;
+            align-items: center;
         }
         #message-input {
             flex: 1;
-            padding: 12px 18px;
-            border-radius: 22px;
-            border: none;
-            background: #2c2c2e;
+            padding: 14px 20px;
+            border-radius: 28px;
+            border: 1px solid #49454f;
+            background: #2d2b32;
             color: #fff;
             font-size: 0.95rem;
             outline: none;
         }
+        #message-input:focus {
+            border-color: #93c5fd;
+        }
+        /* Спокойная кнопка отправки */
         #send-button {
-            background: #007aff;
-            color: #fff;
+            background: #384358;
+            color: #e3ebf8;
             border: none;
-            padding: 0 22px;
-            border-radius: 22px;
-            font-size: 0.95rem;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            font-size: 1.1rem;
             cursor: pointer;
-            font-weight: bold;
-            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s, transform 0.1s;
+            flex-shrink: 0;
         }
         #send-button:hover {
-            background: #0063cc;
+            background: #46546f;
         }
-        /* Встроенный индикатор печатания */
+        #send-button:active {
+            transform: scale(0.95);
+        }
+        /* Индикатор печатания */
         #typing-status {
             position: absolute;
             bottom: 4px;
-            left: 32px;
+            left: 40px;
             font-size: 0.75rem;
-            opacity: 0.5;
+            color: #938f99;
             font-style: italic;
-            color: #fff;
             pointer-events: none;
             height: 14px;
             line-height: 14px;
@@ -200,366 +241,377 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: #111;
+            background: #141218;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            padding: 30px;
+            padding: 32px;
             z-index: 10;
             display: none;
-            border-radius: 24px;
+            border-radius: 28px;
         }
         #auth-overlay h2 {
-            margin-bottom: 20px;
-            font-weight: 600;
-            font-size: 1.4rem;
+            margin-bottom: 24px;
+            font-weight: 500;
+            font-size: 1.6rem;
+            color: #fff;
         }
         #username-input {
             width: 100%;
-            max-width: 300px;
-            padding: 14px;
-            border-radius: 12px;
-            border: none;
-            background: #2c2c2e;
+            max-width: 320px;
+            padding: 16px;
+            border-radius: 16px;
+            border: 1px solid #49454f;
+            background: #1d1b20;
             color: #fff;
             font-size: 1rem;
             text-align: center;
             outline: none;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        #username-input:focus {
+            border-color: #93c5fd;
         }
         #login-button {
             width: 100%;
-            max-width: 300px;
-            background: #007aff;
-            color: #fff;
+            max-width: 320px;
+            background: #384358;
+            color: #e3ebf8;
             border: none;
-            padding: 14px;
-            border-radius: 12px;
+            padding: 16px;
+            border-radius: 16px;
             font-size: 1rem;
-            font-weight: bold;
+            font-weight: 500;
             cursor: pointer;
             transition: background 0.2s;
         }
         #login-button:hover {
-            background: #0063cc;
+            background: #46546f;
         }
     </style>
 </head>
 <body>
-    <div id="chat-container">
-        <!-- Шапка чата -->
-        <div id="chat-header">
-            <div id="header-info">
-                <span id="current-user-display">Загрузка...</span>
-                <span id="online-count">онлайн: 0</span>
-            </div>
-            <div id="header-buttons">
-                <button id="clear-history-button">Очистить</button>
-                <button id="logout-button">Выйти</button>
-            </div>
+<div id="chat-container">
+    <!-- Шапка чата -->
+    <div id="chat-header">
+        <div id="header-info">
+            <span id="current-user-display">Загрузка...</span>
+            <span id="online-count">онлайн: 0</span>
         </div>
-
-        <!-- Поиск по истории -->
-        <div id="search-bar">
-            <input type="text" id="search-input" placeholder="Поиск по сообщениям...">
-        </div>
-
-        <!-- Окно ввода имени -->
-        <div id="auth-overlay">
-            <h2>Представьтесь</h2>
-            <input type="text" id="username-input" placeholder="Ваше имя..." maxlength="20" autocomplete="off">
-            <button id="login-button">Войти в чат</button>
-        </div>
-
-        <!-- Список сообщений -->
-        <div id="messages"></div>
-
-        <!-- Нижний блок управления -->
-        <div id="bottom-bar">
-            <div id="input-container">
-                <input type="text" id="message-input" placeholder="Сообщение..." autocomplete="off">
-                <button id="send-button">Отправить</button>
-            </div>
-            <div id="typing-status"></div>
+        <div id="header-buttons">
+            <button id="clear-history-button">Очистить</button>
+            <button id="logout-button">Выйти</button>
         </div>
     </div>
 
-    <script>
-        // --- КОНФИГУРАЦИЯ FIREBASE ---
-        const firebaseConfig = { databaseURL: "https://freedom-9cedb-default-rtdb.firebaseio.com/" };
-        firebase.initializeApp(firebaseConfig);
+    <!-- Поиск по истории -->
+    <div id="search-bar">
+        <input type="text" id="search-input" placeholder="Поиск по сообщениям...">
+    </div>
 
-        const db = firebase.database().ref('chat_messages');
-        const typingRef = firebase.database().ref('typing');
-        const onlineRef = firebase.database().ref('online_users');
+    <!-- Окно ввода имени -->
+    <div id="auth-overlay">
+        <h2>Представьтесь</h2>
+        <input type="text" id="username-input" placeholder="Ваше имя..." maxlength="20" autocomplete="off">
+        <button id="login-button">Войти в чат</button>
+    </div>
 
-        const messagesBox = document.getElementById('messages');
-        const messageInput = document.getElementById('message-input');
-        const sendButton = document.getElementById('send-button');
-        const logoutButton = document.getElementById('logout-button');
-        const clearHistoryButton = document.getElementById('clear-history-button');
-        const authOverlay = document.getElementById('auth-overlay');
-        const usernameInput = document.getElementById('username-input');
-        const loginButton = document.getElementById('login-button');
-        const currentUserDisplay = document.getElementById('current-user-display');
-        const onlineCountSpan = document.getElementById('online-count');
-        const searchBar = document.getElementById('search-bar');
-        const searchInput = document.getElementById('search-input');
+    <!-- Список сообщений -->
+    <div id="messages"></div>
 
-        let username = localStorage.getItem('chat_username');
-        let lastMessageDateString = '';
-        let typingTimeout;
-        let localMessagesCache = [];
+    <!-- Нижний блок управления -->
+    <div id="bottom-bar">
+        <div id="input-container">
+            <input type="text" id="message-input" placeholder="Сообщение..." autocomplete="off">
+            <button id="send-button">➤</button>
+        </div>
+        <div id="typing-status"></div>
+    </div>
+</div>
 
-        // --- ПРОВЕРКА АВТОРИЗАЦИИ ---
-        function checkAuth() {
-            if (!username) {
-                authOverlay.style.display = 'flex';
-                searchBar.style.display = 'none';
-            } else {
-                authOverlay.style.display = 'none';
-                searchBar.style.display = 'block';
-                currentUserDisplay.innerText = username;
-                initChatListeners();
-                initOnlinePresence();
-            }
+<script>
+    // --- КОНФИГУРАЦИЯ FIREBASE ---
+    const firebaseConfig = { databaseURL: "https://freedom-9cedb-default-rtdb.firebaseio.com/" };
+    firebase.initializeApp(firebaseConfig);
+
+    const db = firebase.database().ref('chat_messages');
+    const typingRef = firebase.database().ref('typing');
+    const onlineRef = firebase.database().ref('online_users');
+    const amOnlineRef = firebase.database().ref('.info/connected');
+
+    const messagesBox = document.getElementById('messages');
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+    const logoutButton = document.getElementById('logout-button');
+    const clearHistoryButton = document.getElementById('clear-history-button');
+    const authOverlay = document.getElementById('auth-overlay');
+    const usernameInput = document.getElementById('username-input');
+    const loginButton = document.getElementById('login-button');
+    const currentUserDisplay = document.getElementById('current-user-display');
+    const onlineCountSpan = document.getElementById('online-count');
+    const searchBar = document.getElementById('search-bar');
+    const searchInput = document.getElementById('search-input');
+
+    let username = localStorage.getItem('chat_username');
+    let lastMessageDateString = '';
+    let typingTimeout;
+    let localMessagesCache = [];
+
+    // --- ПРОВЕРКА АВТОРИЗАЦИИ ---
+    function checkAuth() {
+        if (!username) {
+            authOverlay.style.display = 'flex';
+            searchBar.style.display = 'none';
+        } else {
+            authOverlay.style.display = 'none';
+            searchBar.style.display = 'block';
+            currentUserDisplay.innerText = username;
+            initChatListeners();
+            initOnlinePresence();
         }
+    }
 
-        // Функция отправки системных сообщений
-        function sendSystemMessage(text) {
-            const systemMessage = {
-                name: 'Система',
-                text: text,
-                timestamp: firebase.database.ServerValue.TIMESTAMP,
-                isSystem: true
-            };
-            db.push(systemMessage);
-        }
+    function sendSystemMessage(text) {
+        const systemMessage = {
+            name: 'Система',
+            text: text,
+            timestamp: firebase.database.ServerValue.TIMESTAMP,
+            isSystem: true
+        };
+        db.push(systemMessage);
+    }
 
-        function handleLogin() {
-            const name = usernameInput.value.trim();
-            if (!name) return;
-            username = name;
-            localStorage.setItem('chat_username', username);
-            checkAuth();
-            
-            sendSystemMessage(`Пользователь ${username} вошел в чат`);
-        }
-
-        loginButton.addEventListener('click', handleLogin);
-        usernameInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') handleLogin();
-        });
-
-        // --- ЛОГИКА ВЫХОДА ---
-        logoutButton.addEventListener('click', () => {
-            if (username) {
-                typingRef.child(username).set(false);
-                onlineRef.child(username).remove();
-                sendSystemMessage(`Пользователь ${username} покинул чат`);
-            }
-            localStorage.removeItem('chat_username');
-            setTimeout(() => { location.reload(); }, 500);
-        });
-
-        // --- ОЧИСТКА ИСТОРИИ ПО ПАРОЛЮ ---
-        clearHistoryButton.addEventListener('click', () => {
-            const password = prompt('Введите пароль администратора для очистки истории:');
-            if (password === '1029') {
-                if (confirm('Вы уверены, что хотите полностью стереть историю сообщений?')) {
-                    db.remove()
-                        .then(() => {
-                            messagesBox.innerHTML = '';
-                            localMessagesCache = [];
-                            lastMessageDateString = '';
-                            sendSystemMessage('Администратор очистил историю чата');
-                        })
-                        .catch((error) => {
-                            alert('Ошибка при очистке: ' + error.message);
-                        });
-                }
-            } else if (password !== null) {
-                alert('Неверный пароль!');
-            }
-        });
-
-        // --- ФУНКЦИЯ ОТПРАВКИ СООБЩЕНИЯ ---
-        function sendMessage() {
-            const text = messageInput.value.trim();
-            if (!text || !username) return;
-
-            const newMessage = {
-                name: username,
-                text: text,
-                timestamp: firebase.database.ServerValue.TIMESTAMP,
-                views: { [username]: true }
-            };
-
-            db.push(newMessage);
-            messageInput.value = '';
-            clearTimeout(typingTimeout);
-            typingRef.child(username).set(false);
-        }
-
-        sendButton.addEventListener('click', sendMessage);
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
-        });
-
-        // --- ОТСЛЕЖИВАНИЕ ПЕЧАТАНИЯ ---
-        messageInput.addEventListener('input', () => {
-            if (!username) return;
-            typingRef.child(username).set(true);
-            clearTimeout(typingTimeout);
-            typingTimeout = setTimeout(() => {
-                typingRef.child(username).set(false);
-            }, 2500);
-        });
-
-        // --- СИСТЕМА ОНЛАЙН СТАТУСА ---
-        function initOnlinePresence() {
-            const amOnlineRef = firebase.database().ref('.info/connected');
-            
-            amOnlineRef.on('value', (snapshot) => {
-                if (snapshot.val() === true) {
-                    const userStatusRef = onlineRef.child(username);
-                    userStatusRef.onDisconnect().remove();
-                    userStatusRef.set(true);
-                }
-            });
-
-            onlineRef.on('value', (snapshot) => {
-                const totalOnline = snapshot.numChildren();
-                onlineCountSpan.innerText = `онлайн: ${totalOnline}`;
-            });
-        }
-
-        // --- ЛОКАЛЬНЫЙ ПОИСК ПО ИСТОРИИ ---
-        searchInput.addEventListener('input', () => {
-            const query = searchInput.value.toLowerCase().trim();
-            
-            localMessagesCache.forEach(item => {
-                const element = document.getElementById(item.id);
-                if (!element) return;
-
-                const matches = item.isSystem 
-                    ? item.text.toLowerCase().includes(query)
-                    : item.text.toLowerCase().includes(query) || item.name.toLowerCase().includes(query);
-
-                if (matches) {
-                    element.style.display = '';
-                } else {
-                    element.style.display = 'none';
-                }
-            });
-        });
-
-        // --- ИНИЦИАЛИЗАЦИЯ СЛУШАТЕЛЕЙ FIREBASE ---
-        function initChatListeners() {
-            typingRef.on('value', (snapshot) => {
-                const typingUsers = snapshot.val() || {};
-                const activeTypers = Object.keys(typingUsers).filter(name => name !== username && typingUsers[name] === true);
-                const typingStatusDiv = document.getElementById('typing-status');
-                
-                if (activeTypers.length > 0) {
-                    typingStatusDiv.innerText = activeTypers.length === 1 
-                        ? `${activeTypers[0]} печатает...` 
-                        : `${activeTypers.join(', ')} печатают...`;
-                } else {
-                    typingStatusDiv.innerText = '';
-                }
-            });
-
-            // Слушаем удаление всей базы извне
-            db.on('value', (snapshot) => {
-                if (!snapshot.exists()) {
-                    messagesBox.innerHTML = '';
-                    localMessagesCache = [];
-                    lastMessageDateString = '';
-                }
-            });
-
-            db.limitToLast(50).on('child_added', (snapshot) => {
-                const messageId = snapshot.key;
-                const data = snapshot.val();
-                let timeString = '';
-                let dateString = '';
-                let isToday = false;
-
-                if (data.timestamp) {
-                    const date = new Date(data.timestamp);
-                    timeString = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-                    dateString = date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-                    const todayString = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-                    if (dateString === todayString) isToday = true;
-                }
-
-                localMessagesCache.push({
-                    id: data.isSystem ? `sys-${messageId}` : `msg-${messageId}`,
-                    name: data.name || '',
-                    text: data.text || '',
-                    isSystem: !!data.isSystem
-                });
-
-                if (!data.isSystem && data.name !== username && (!data.views || !data.views[username])) {
-                    db.child(messageId).child('views').child(username).set(true);
-                }
-
-                if (dateString && dateString !== lastMessageDateString) {
-                    messagesBox.innerHTML += `
-                        <div style="text-align: center; margin: 1.5rem 0 0.5rem; font-size: 0.8rem; opacity: 0.4; width: 100%;">
-                            — ${isToday ? 'Сегодня' : dateString} —
-                        </div>
-                    `;
-                    lastMessageDateString = dateString;
-                }
-
-                if (data.isSystem) {
-                    messagesBox.innerHTML += `
-                        <div id="sys-${messageId}" style="text-align: center; margin: 0.5rem 0; font-size: 0.85rem; opacity: 0.6; font-style: italic; width: 100%; color: #007aff;">
-                            ${data.text} (${timeString})
-                        </div>
-                    `;
-                } else {
-                    const messageClass = data.name === username ? 'own' : 'other';
-                    const viewsCount = data.views ? Object.keys(data.views).length : 1;
-                    const ticks = viewsCount > 1 ? '✓✓' : '✓';
-                    const statusTicks = messageClass === 'own' ? `<span class="ticks" style="margin-left: 5px; opacity: 0.6;">${ticks}</span>` : '';
-
-                    messagesBox.innerHTML += `
-                        <div id="msg-${messageId}" class="message ${messageClass}">
-                            <div class="message-meta">
-                                <span>${data.name}</span>
-                                <span>${timeString}${statusTicks}</span>
-                            </div>
-                            <div>${data.text}</div>
-                        </div>
-                    `;
-                }
-
-                if (!searchInput.value.trim()) {
-                    messagesBox.scrollTop = messagesBox.scrollHeight;
-                }
-            });
-
-            db.limitToLast(50).on('child_changed', (snapshot) => {
-                const messageId = snapshot.key;
-                const data = snapshot.val();
-                
-                if (data.isSystem) return;
-
-                const msgElement = document.getElementById(`msg-${messageId}`);
-                if (msgElement && data.name === username) {
-                    const viewsCount = data.views ? Object.keys(data.views).length : 1;
-                    const ticks = viewsCount > 1 ? '✓✓' : '✓';
-                    const ticksSpan = msgElement.querySelector('.ticks');
-                    if (ticksSpan) ticksSpan.innerText = ticks;
-                }
-            });
-        }
-
+    function handleLogin() {
+        const name = usernameInput.value.trim();
+        if (!name) return;
+        username = name;
+        localStorage.setItem('chat_username', username);
         checkAuth();
-    </script>
+        sendSystemMessage(`Пользователь ${username} вошел в чат`);
+    }
+
+    loginButton.addEventListener('click', handleLogin);
+    usernameInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleLogin(); });
+
+    // --- ЛОГИКА ВЫХОДА (Исправлены утечки памяти) ---
+    logoutButton.addEventListener('click', () => {
+        if (username) {
+            typingRef.child(username).set(false);
+            onlineRef.child(username).remove();
+            sendSystemMessage(`Пользователь ${username} покинул чат`);
+        }
+        
+        // Отписываемся от всех слушателей перед очисткой страницы
+        amOnlineRef.off();
+        onlineRef.off();
+        typingRef.off();
+        db.off();
+
+        localStorage.removeItem('chat_username');
+        setTimeout(() => { location.reload(); }, 300);
+    });
+
+    // --- ОЧИСТКА ИСТОРИИ ПО ПАРОЛЮ ---
+    clearHistoryButton.addEventListener('click', () => {
+        const password = prompt('Введите пароль администратора для очистки истории:');
+        if (password === '1029') {
+            if (confirm('Вы уверены, что хотите полностью стереть историю сообщений?')) {
+                db.remove()
+                    .then(() => {
+                        messagesBox.innerHTML = '';
+                        localMessagesCache = [];
+                        lastMessageDateString = '';
+                        sendSystemMessage('Администратор очистил историю чата');
+                    })
+                    .catch((error) => { alert('Ошибка при очистке: ' + error.message); });
+            }
+        } else if (password !== null) {
+            alert('Неверный пароль!');
+        }
+    });
+
+    // --- ФУНКЦИЯ ОТПРАВКИ СООБЩЕНИЯ ---
+    function sendMessage() {
+        const text = messageInput.value.trim();
+        if (!text || !username) return;
+        const newMessage = {
+            name: username,
+            text: text,
+            timestamp: firebase.database.ServerValue.TIMESTAMP,
+            views: { [username]: true }
+        };
+        db.push(newMessage);
+        messageInput.value = '';
+        clearTimeout(typingTimeout);
+        typingRef.child(username).set(false);
+    }
+
+    sendButton.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
+
+    // --- ОТСЛЕЖИВАНИЕ ПЕЧАТАНИЯ ---
+    messageInput.addEventListener('input', () => {
+        if (!username) return;
+        typingRef.child(username).set(true);
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => { typingRef.child(username).set(false); }, 2500);
+    });
+
+    // --- СИСТЕМА ОНЛАЙН СТАТУСА ---
+    function initOnlinePresence() {
+        amOnlineRef.on('value', (snapshot) => {
+            if (snapshot.val() === true) {
+                const userStatusRef = onlineRef.child(username);
+                userStatusRef.onDisconnect().remove();
+                userStatusRef.set(true);
+            }
+        });
+
+        onlineRef.on('value', (snapshot) => {
+            const totalOnline = snapshot.numChildren();
+            onlineCountSpan.innerText = `онлайн: ${totalOnline}`;
+        });
+    }
+
+    // --- ЛОКАЛЬНЫЙ ПОИСК ПО ИСТОРИИ ---
+    searchInput.addEventListener('input', () => {
+        const query = searchInput.value.toLowerCase().trim();
+        localMessagesCache.forEach(item => {
+            const element = document.getElementById(item.id);
+            if (!element) return;
+            const matches = item.isSystem 
+                ? item.text.toLowerCase().includes(query) 
+                : item.text.toLowerCase().includes(query) || item.name.toLowerCase().includes(query);
+            element.style.display = matches ? '' : 'none';
+        });
+    });
+
+    // --- ИНИЦИАЛИЗАЦИЯ СЛУШАТЕЛЕЙ FIREBASE (Оптимизация DOM через createElement) ---
+    function initChatListeners() {
+        typingRef.on('value', (snapshot) => {
+            const typingUsers = snapshot.val() || {};
+            const activeTypers = Object.keys(typingUsers).filter(name => name !== username && typingUsers[name] === true);
+            const typingStatusDiv = document.getElementById('typing-status');
+            if (activeTypers.length > 0) {
+                typingStatusDiv.innerText = activeTypers.length === 1 
+                    ? `${activeTypers[0]} печатает...` 
+                    : `${activeTypers.join(', ')} печатают...`;
+            } else {
+                typingStatusDiv.innerText = '';
+            }
+        });
+
+        db.on('value', (snapshot) => {
+            if (!snapshot.exists()) {
+                messagesBox.innerHTML = '';
+                localMessagesCache = [];
+                lastMessageDateString = '';
+            }
+        });
+
+        db.limitToLast(50).on('child_added', (snapshot) => {
+            const messageId = snapshot.key;
+            const data = snapshot.val();
+            let timeString = '';
+            let dateString = '';
+            let isToday = false;
+
+            if (data.timestamp) {
+                const date = new Date(data.timestamp);
+                timeString = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                dateString = date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+                const todayString = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+                if (dateString === todayString) isToday = true;
+            }
+
+            localMessagesCache.push({
+                id: data.isSystem ? `sys-${messageId}` : `msg-${messageId}`,
+                name: data.name || '',
+                text: data.text || '',
+                isSystem: !!data.isSystem
+            });
+
+            if (!data.isSystem && data.name !== username && (!data.views || !data.views[username])) {
+                db.child(messageId).child('views').child(username).set(true);
+            }
+
+            // Добавляем разделитель даты через createElement
+            if (dateString && dateString !== lastMessageDateString) {
+                const dateDiv = document.createElement('div');
+                dateDiv.className = 'date-divider';
+                dateDiv.innerText = `— ${isToday ? 'Сегодня' : dateString} —`;
+                messagesBox.appendChild(dateDiv);
+                lastMessageDateString = dateString;
+            }
+
+            // Добавляем само сообщение через createElement
+            if (data.isSystem) {
+                const sysDiv = document.createElement('div');
+                sysDiv.id = `sys-${messageId}`;
+                sysDiv.className = 'system-msg';
+                sysDiv.innerText = `${data.text} (${timeString})`;
+                messagesBox.appendChild(sysDiv);
+            } else {
+                const messageClass = data.name === username ? 'own' : 'other';
+                const viewsCount = data.views ? Object.keys(data.views).length : 1;
+                const ticks = viewsCount > 1 ? '✓✓' : '✓';
+
+                const msgDiv = document.createElement('div');
+                msgDiv.id = `msg-${messageId}`;
+                msgDiv.className = `message ${messageClass}`;
+
+                // Внутренняя структура разметки мета-данных
+                const metaDiv = document.createElement('div');
+                metaDiv.className = 'message-meta';
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.innerText = data.name;
+                
+                const timeSpan = document.createElement('span');
+                timeSpan.innerText = timeString + ' ';
+                
+                if (messageClass === 'own') {
+                    const ticksSpan = document.createElement('span');
+                    ticksSpan.className = 'ticks';
+                    ticksSpan.style.marginLeft = '5px';
+                    ticksSpan.style.opacity = '0.7';
+                    ticksSpan.innerText = ticks;
+                    timeSpan.appendChild(ticksSpan);
+                }
+
+                metaDiv.appendChild(nameSpan);
+                metaDiv.appendChild(timeSpan);
+
+                const textDiv = document.createElement('div');
+                textDiv.innerText = data.text;
+
+                msgDiv.appendChild(metaDiv);
+                msgDiv.appendChild(textDiv);
+                messagesBox.appendChild(msgDiv);
+            }
+
+            if (!searchInput.value.trim()) {
+                messagesBox.scrollTop = messagesBox.scrollHeight;
+            }
+        });
+
+        db.limitToLast(50).on('child_changed', (snapshot) => {
+            const messageId = snapshot.key;
+            const data = snapshot.val();
+            if (data.isSystem) return;
+
+            const msgElement = document.getElementById(`msg-${messageId}`);
+            if (msgElement && data.name === username) {
+                const viewsCount = data.views ? Object.keys(data.views).length : 1;
+                const ticks = viewsCount > 1 ? '✓✓' : '✓';
+                const ticksSpan = msgElement.querySelector('.ticks');
+                if (ticksSpan) ticksSpan.innerText = ticks;
+            }
+        });
+    }
+
+    checkAuth();
+</script>
 </body>
 </html>
