@@ -48,9 +48,19 @@
             font-size: 0.95rem;
             z-index: 2;
         }
+        #header-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
         #current-user-display {
             font-weight: 600;
             color: #fff;
+        }
+        #online-count {
+            font-size: 0.75rem;
+            color: #30d158;
+            font-weight: 500;
         }
         #logout-button {
             background: none;
@@ -63,6 +73,23 @@
         }
         #logout-button:hover {
             opacity: 0.7;
+        }
+        /* Панель поиска */
+        #search-bar {
+            background: #1a1a1c;
+            padding: 8px 15px;
+            border-bottom: 1px solid #2c2c2e;
+            display: none; /* Покажется после авторизации */
+        }
+        #search-input {
+            width: 100%;
+            padding: 8px 14px;
+            border-radius: 10px;
+            border: none;
+            background: #2c2c2e;
+            color: #fff;
+            font-size: 0.85rem;
+            outline: none;
         }
         /* Область сообщений */
         #messages {
@@ -136,7 +163,7 @@
         #send-button:hover {
             background: #0063cc;
         }
-        /* Аккуратный встроенный индикатор печатания в стиле Telegram */
+        /* Встроенный индикатор печатания */
         #typing-status {
             position: absolute;
             bottom: 4px;
@@ -149,7 +176,7 @@
             height: 14px;
             line-height: 14px;
         }
-        /* Окно авторизации в стиле приложения */
+        /* Окно авторизации */
         #auth-overlay {
             position: absolute;
             top: 0;
@@ -206,8 +233,16 @@
     <div id="chat-container">
         <!-- Шапка чата -->
         <div id="chat-header">
-            <span id="current-user-display">Загрузка...</span>
+            <div id="header-info">
+                <span id="current-user-display">Загрузка...</span>
+                <span id="online-count">онлайн: 0</span>
+            </div>
             <button id="logout-button">Выйти</button>
+        </div>
+
+        <!-- Поиск по истории -->
+        <div id="search-bar">
+            <input type="text" id="search-input" placeholder="Поиск по сообщениям...">
         </div>
 
         <!-- Окно ввода имени -->
@@ -237,6 +272,7 @@
 
         const db = firebase.database().ref('chat_messages');
         const typingRef = firebase.database().ref('typing');
+        const onlineRef = firebase.database().ref('online_users');
 
         const messagesBox = document.getElementById('messages');
         const messageInput = document.getElementById('message-input');
@@ -246,19 +282,26 @@
         const usernameInput = document.getElementById('username-input');
         const loginButton = document.getElementById('login-button');
         const currentUserDisplay = document.getElementById('current-user-display');
+        const onlineCountSpan = document.getElementById('online-count');
+        const searchBar = document.getElementById('search-bar');
+        const searchInput = document.getElementById('search-input');
 
         let username = localStorage.getItem('chat_username');
         let lastMessageDateString = '';
         let typingTimeout;
+        let localMessagesCache = []; // Хранилище для мгновенного локального поиска
 
         // --- ПРОВЕРКА АВТОРИЗАЦИИ ---
         function checkAuth() {
             if (!username) {
                 authOverlay.style.display = 'flex';
+                searchBar.style.display = 'none';
             } else {
                 authOverlay.style.display = 'none';
+                searchBar.style.display = 'block';
                 currentUserDisplay.innerText = username;
                 initChatListeners();
+                initOnlinePresence();
             }
         }
 
@@ -280,7 +323,6 @@
             localStorage.setItem('chat_username', username);
             checkAuth();
             
-            // Уведомление о входе
             sendSystemMessage(`Пользователь ${username} вошел в чат`);
         }
 
@@ -293,11 +335,10 @@
         logoutButton.addEventListener('click', () => {
             if (username) {
                 typingRef.child(username).set(false);
-                // Уведомление о выходе
+                onlineRef.child(username).remove();
                 sendSystemMessage(`Пользователь ${username} покинул чат`);
             }
             localStorage.removeItem('chat_username');
-            // Небольшой таймаут, чтобы Firebase успел записать данные перед перезагрузкой
             setTimeout(() => { location.reload(); }, 500);
         });
 
@@ -334,6 +375,47 @@
             }, 2500);
         });
 
+        // --- СИСТЕМА ОНЛАЙН СТАТУСА (PRESENCE) ---
+        function initOnlinePresence() {
+            const amOnlineRef = firebase.database().ref('.info/connected');
+            
+            amOnlineRef.on('value', (snapshot) => {
+                if (snapshot.val() === true) {
+                    const userStatusRef = onlineRef.child(username);
+                    // Когда юзер отключится (закроет вкладку) — автоматически удалить его из базы
+                    userStatusRef.onDisconnect().remove();
+                    userStatusRef.set(true);
+                }
+            });
+
+            // Слушаем общее количество людей онлайн
+            onlineRef.on('value', (snapshot) => {
+                const totalOnline = snapshot.numChildren();
+                onlineCountSpan.innerText = `онлайн: ${totalOnline}`;
+            });
+        }
+
+        // --- ЛОКАЛЬНЫЙ ПОИСК ПО ИСТОРИИ ---
+        searchInput.addEventListener('input', () => {
+            const query = searchInput.value.toLowerCase().trim();
+            
+            localMessagesCache.forEach(item => {
+                const element = document.getElementById(item.id);
+                if (!element) return;
+
+                // Если системное сообщение — ищем по тексту, иначе по автору и тексту
+                const matches = item.isSystem 
+                    ? item.text.toLowerCase().includes(query)
+                    : item.text.toLowerCase().includes(query) || item.name.toLowerCase().includes(query);
+
+                if (matches) {
+                    element.style.display = '';
+                } else {
+                    element.style.display = 'none'; // Скрываем неподходящие под фильтр
+                }
+            });
+        });
+
         // --- ИНИЦИАЛИЗАЦИЯ СЛУШАТЕЛЕЙ FIREBASE ---
         function initChatListeners() {
             // Слушаем, кто сейчас печатает
@@ -367,7 +449,15 @@
                     if (dateString === todayString) isToday = true;
                 }
 
-                // Отметка о прочтении для обычных сообщений
+                // Кэшируем для последующего поиска
+                localMessagesCache.push({
+                    id: data.isSystem ? `sys-${messageId}` : `msg-${messageId}`,
+                    name: data.name || '',
+                    text: data.text || '',
+                    isSystem: !!data.isSystem
+                });
+
+                // Отметка о прочтении
                 if (!data.isSystem && data.name !== username && (!data.views || !data.views[username])) {
                     db.child(messageId).child('views').child(username).set(true);
                 }
@@ -382,10 +472,10 @@
                     lastMessageDateString = dateString;
                 }
 
-                // Отрисовка сообщений (Системное / Пользовательское)
+                // Отрисовка
                 if (data.isSystem) {
                     messagesBox.innerHTML += `
-                        <div style="text-align: center; margin: 0.5rem 0; font-size: 0.85rem; opacity: 0.6; font-style: italic; width: 100%; color: #007aff;">
+                        <div id="sys-${messageId}" style="text-align: center; margin: 0.5rem 0; font-size: 0.85rem; opacity: 0.6; font-style: italic; width: 100%; color: #007aff;">
                             ${data.text} (${timeString})
                         </div>
                     `;
@@ -406,8 +496,10 @@
                     `;
                 }
 
-                // Автоматический скролл вниз
-                messagesBox.scrollTop = messagesBox.scrollHeight;
+                // Автоматический скролл вниз, только если пользователь не ищет что-то в данный момент
+                if (!searchInput.value.trim()) {
+                    messagesBox.scrollTop = messagesBox.scrollHeight;
+                }
             });
 
             // Слушаем изменения галочек
