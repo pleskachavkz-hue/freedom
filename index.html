@@ -1,262 +1,181 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Freedom Chat</title>
     <!-- Подключаем Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
-
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        margin: 0;
-        font-family:
-          system-ui,
-          -apple-system,
-          sans-serif;
-        background: #0f1117;
-        color: #e8eaed;
-        height: 100dvh;
-        display: flex;
-        flex-direction: column;
-      }
-      header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1rem 1.25rem;
-        border-bottom: 1px solid #2a2f3a;
-        background: #151922;
-      }
-      header h1 {
-        margin: 0;
-        font-size: 1.1rem;
-        font-weight: 600;
-      }
-      #messages {
-        flex: 1;
-        overflow-y: auto;
-        padding: 1rem 1.25rem;
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-      }
-      .message {
-        max-width: min(75%, 520px);
-        padding: 0.65rem 0.85rem;
-        border-radius: 12px;
-        line-height: 1.4;
-        word-break: break-word;
-      }
-      .message.other {
-        align-self: flex-start;
-        background: #1e2430;
-      }
-      .message.own {
-        align-self: flex-end;
-        background: #2563eb;
-      }
-      .message-meta {
-        font-size: 0.75rem;
-        opacity: 0.75;
-        margin-bottom: 0.25rem;
-      }
-      #composer {
-        display: flex;
-        gap: 0.5rem;
-        padding: 1rem 1.25rem;
-        border-top: 1px solid #2a2f3a;
-        background: #151922;
-      }
-      #message-input {
-        flex: 1;
-        padding: 0.75rem 0.9rem;
-        border: 1px solid #2a2f3a;
-        border-radius: 10px;
-        background: #0f1117;
-        color: #e8eaed;
-        font: inherit;
-      }
-      #message-input:focus {
-        outline: 2px solid #2563eb;
-        outline-offset: 1px;
-      }
-      button {
-        padding: 0.75rem 1rem;
-        border: none;
-        border-radius: 10px;
-        background: #2563eb;
-        color: white;
-        font: inherit;
-        font-weight: 600;
-        cursor: pointer;
-      }
-      #overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.65);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 1rem;
-        z-index: 10;
-      }
-      #overlay.hidden {
-        display: none;
-      }
-      .modal {
-        width: min(100%, 360px);
-        background: #151922;
-        border: 1px solid #2a2f3a;
-        border-radius: 14px;
-        padding: 1.25rem;
-      }
-      .modal h2 {
-        margin: 0 0 0.75rem;
-        font-size: 1.1rem;
-      }
-      #username-input {
-        width: 100%;
-        padding: 0.75rem 0.9rem;
-        border: 1px solid #2a2f3a;
-        border-radius: 10px;
-        background: #0f1117;
-        color: #e8eaed;
-        font: inherit;
-        margin-bottom: 0.75rem;
-      }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #111; color: #fff; display: flex; flex-direction: column; height: 100vh; }
+        #chat-container { display: flex; flex-direction: column; flex: 1; max-width: 600px; width: 100%; margin: 0 auto; background: #1e1e1e; }
+        #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .message { max-width: 75%; padding: 10px 14px; border-radius: 16px; font-size: 0.95rem; line-height: 1.4; word-break: break-word; position: relative; }
+        .message.own { background-color: #007aff; align-self: flex-end; border-bottom-right-radius: 4px; }
+        .message.other { background-color: #2c2c2e; align-self: flex-start; border-bottom-left-radius: 4px; }
+        .message-meta { font-size: 0.75rem; opacity: 0.6; margin-bottom: 4px; display: flex; justify-content: space-between; gap: 10px; }
+        #typing-status { font-size: 0.8rem; opacity: 0.5; padding: 5px 20px; font-style: italic; min-height: 24px; background: #1e1e1e; max-width: 600px; width: 100%; margin: 0 auto; }
+        #input-container { display: flex; padding: 10px; background: #111; gap: 10px; max-width: 600px; width: 100%; margin: 0 auto; }
+        #message-input { flex: 1; padding: 12px; border-radius: 22px; border: none; background: #2c2c2e; color: #fff; font-size: 0.95rem; outline: none; }
+        #send-button { background: #007aff; color: #fff; border: none; padding: 0 20px; border-radius: 22px; font-size: 0.95rem; cursor: pointer; font-weight: bold; }
+        #send-button:hover { background: #0063cc; }
     </style>
-  </head>
-  <body>
-    <!-- Окно авторизации -->
-    <div id="overlay">
-      <div class="modal">
-        <h2>Добро пожаловать в Freedom</h2>
-        <input
-          type="text"
-          id="username-input"
-          placeholder="Ваше имя..."
-          autocomplete="off"
-        />
-        <button id="login-btn" style="width: 100%">Войти в чат</button>
-      </div>
+</head>
+<body>
+
+    <div id="chat-container">
+        <div id="messages"></div>
     </div>
+    
+    <!-- Индикатор печатания -->
+    <div id="typing-status"></div>
 
-    <!-- Основной интерфейс чата -->
-    <header>
-      <h1>Freedom Chat</h1>
-    </header>
-
-    <div id="messages"></div>
-
-    <div id="composer">
-      <input
-        type="text"
-        id="message-input"
-        placeholder="Сообщение..."
-        disabled
-      />
-      <button id="send" disabled>Послать</button>
+    <div id="input-container">
+        <input type="text" id="message-input" placeholder="Сообщение..." autocomplete="off">
+        <button id="send-button">Отправить</button>
     </div>
 
     <script>
-      // Конфигурация твоей базы данных Firebase
-      const firebaseConfig = {
-        databaseURL: "https://freedom-9cedb-default-rtdb.firebaseio.com/",
-      };
-      firebase.initializeApp(firebaseConfig);
-      const db = firebase.database().ref("chat_messages");
+        // --- КОНФИГУРАЦИЯ FIREBASE ---
+        const firebaseConfig = {
+            databaseURL: "https://freedom-9cedb-default-rtdb.firebaseio.com/" 
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database().ref('chat_messages');
+        const typingRef = firebase.database().ref('typing');
 
-      let username = "";
-
-      const overlay = document.getElementById("overlay");
-      const usernameInput = document.getElementById("username-input");
-      const loginBtn = document.getElementById("login-btn");
-      const messagesBox = document.getElementById("messages");
-      const messageInput = document.getElementById("message-input");
-      const sendBtn = document.getElementById("send");
-
-      // Логика входа
-      function joinChat() {
-        username = usernameInput.value.trim() || "Аноним";
-        overlay.classList.add("hidden"); // прячем модалку
-        messageInput.disabled = false; // активируем инпут
-        sendBtn.disabled = false; // активируем кнопку
-        messageInput.focus();
-      }
-
-      loginBtn.onclick = joinChat;
-      usernameInput.onkeydown = (e) => {
-        if (e.key === "Enter") joinChat();
-      };
-
-      // Переменная для отслеживания даты последнего сообщения
-      let lastMessageDateString = "";
-
-      // СЛУШАЕМ ОБЛАКО
-      db.limitToLast(50).on("child_added", (snapshot) => {
-        const data = snapshot.val();
-
-        let timeString = "";
-        let dateString = "";
-
-        if (data.timestamp) {
-          const date = new Date(data.timestamp);
-          // Форматируем время (ЧЧ:ММ)
-          timeString = date.toLocaleTimeString("ru-RU", {
-            hour: "2-digit",
-            minute: "2-digit",
-          });
-          // Форматируем дату (например, "3 июля 2026 г." или просто "3 июля")
-          dateString = date.toLocaleDateString("ru-RU", {
-            day: "numeric",
-            month: "long",
-          });
+        // --- ЛОГИКА АВТОРИЗАЦИИ ---
+        let username = localStorage.getItem('chat_username');
+        if (!username) {
+            username = prompt('Введите ваше имя для чата:') || 'Аноним';
+            localStorage.setItem('chat_username', username);
         }
 
-        // Если дата этого сообщения отличается от предыдущего, добавляем разделитель дня
-        if (dateString && dateString !== lastMessageDateString) {
-          messagesBox.innerHTML += `
-                <div style="text-align: center; margin: 1.5rem 0 0.5rem; font-size: 0.8rem; opacity: 0.4; width: 100%;">
-                    — ${dateString} —
-                </div>
-            `;
-          lastMessageDateString = dateString; // Запоминаем новую дату
+        const messagesBox = document.getElementById('messages');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+
+        let lastMessageDateString = '';
+        let typingTimeout;
+
+        // --- ФУНКЦИЯ ОТПРАВКИ СООБЩЕНИЯ ---
+        function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text) return;
+
+            const newMessage = {
+                name: username,
+                text: text,
+                timestamp: firebase.database.ServerValue.TIMESTAMP,
+                views: {
+                    [username]: true // Автор сразу прочитал своё сообщение
+                }
+            };
+
+            db.push(newMessage);
+            messageInput.value = '';
+            
+            // Сразу гасим статус печатания после отправки
+            clearTimeout(typingTimeout);
+            typingRef.child(username).set(false);
         }
 
-        // Определяем класс: если имя совпадает с текущим пользователем — own (синий), иначе — other (серый)
-        const messageClass = data.name === username ? "own" : "other";
-
-        messagesBox.innerHTML += `
-            <div class="message ${messageClass}">
-                <div class="message-meta">${data.name} ${timeString ? `<span style="opacity: 0.5; margin-left: 5px;">${timeString}</span>` : ""}</div>
-                <div>${data.text}</div>
-            </div>
-        `;
-        messagesBox.scrollTop = messagesBox.scrollHeight;
-      });
-
-      // ОТПРАВЛЯЕМ В ОБЛАКО
-      function send() {
-        if (!messageInput.value.trim()) return;
-
-        db.push({
-          name: username,
-          text: messageInput.value,
-          timestamp: Date.now(),
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
         });
 
-        messageInput.value = "";
-      }
+        // --- ОТСЛЕЖИВАНИЕ ПЕЧАТАНИЯ ---
+        messageInput.addEventListener('input', () => {
+            typingRef.child(username).set(true);
 
-      sendBtn.onclick = send;
-      messageInput.onkeydown = (e) => {
-        if (e.key === "Enter") send();
-      };
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                typingRef.child(username).set(false);
+            }, 2500);
+        });
+
+        // Слушаем, кто сейчас печатает
+        typingRef.on('value', (snapshot) => {
+            const typingUsers = snapshot.val() || {};
+            // Фильтруем список: убираем себя и тех, у кого статус false
+            const activeTypers = Object.keys(typingUsers).filter(name => name !== username && typingUsers[name] === true);
+            const typingStatusDiv = document.getElementById('typing-status');
+
+            if (activeTypers.length > 0) {
+                typingStatusDiv.innerText = activeTypers.length === 1 
+                    ? `${activeTypers[0]} печатает...` 
+                    : `${activeTypers.join(', ')} печатают...`;
+            } else {
+                typingStatusDiv.innerText = '';
+            }
+        });
+
+        // --- СЛУШАЕМ ОБЛАКО (ПОЛУЧЕНИЕ СООБЩЕНИЙ) ---
+        db.limitToLast(50).on('child_added', (snapshot) => {
+            const messageId = snapshot.key;
+            const data = snapshot.val();
+            
+            let timeString = '';
+            let dateString = '';
+
+            if (data.timestamp) {
+                const date = new Date(data.timestamp);
+                timeString = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                dateString = date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+            }
+
+            // Отмечаем чужие сообщения как прочитанные нами
+            if (data.name !== username && (!data.views || !data.views[username])) {
+                db.child(messageId).child('views').child(username).set(true);
+            }
+
+            // Рендер разделителя дат
+            if (dateString && dateString !== lastMessageDateString) {
+                messagesBox.innerHTML += `
+                    <div style="text-align: center; margin: 1.5rem 0 0.5rem; font-size: 0.8rem; opacity: 0.4; width: 100%;">
+                        — ${dateString} —
+                    </div>
+                `;
+                lastMessageDateString = dateString;
+            }
+
+            const messageClass = data.name === username ? 'own' : 'other';
+            
+            // Расчет галочек прочтения (если прочитал кто-то помимо автора — две галочки)
+            const viewsCount = data.views ? Object.keys(data.views).length : 1;
+            const ticks = viewsCount > 1 ? '✓✓' : '✓';
+            const statusTicks = messageClass === 'own' ? `<span class="ticks" style="margin-left: 5px; opacity: 0.6;">${ticks}</span>` : '';
+
+            messagesBox.innerHTML += `
+                <div id="msg-${messageId}" class="message ${messageClass}">
+                    <div class="message-meta">
+                        <span>${data.name}</span>
+                        <span>${timeString}${statusTicks}</span>
+                    </div>
+                    <div>${data.text}</div>
+                </div>
+            `;
+            messagesBox.scrollTop = messagesBox.scrollHeight;
+        });
+
+        // Слушаем обновления (изменения галочек в реальном времени)
+        db.limitToLast(50).on('child_changed', (snapshot) => {
+            const messageId = snapshot.key;
+            const data = snapshot.val();
+            
+            const msgElement = document.getElementById(`msg-${messageId}`);
+            if (msgElement && data.name === username) {
+                const viewsCount = data.views ? Object.keys(data.views).length : 1;
+                const ticks = viewsCount > 1 ? '✓✓' : '✓';
+                
+                const ticksSpan = msgElement.querySelector('.ticks');
+                if (ticksSpan) ticksSpan.innerText = ticks;
+            }
+        });
     </script>
-  </body>
+</body>
 </html>
