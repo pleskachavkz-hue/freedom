@@ -10,31 +10,64 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #111; color: #fff; display: flex; flex-direction: column; height: 100vh; }
-        #chat-container { display: flex; flex-direction: column; flex: 1; max-width: 600px; width: 100%; margin: 0 auto; background: #1e1e1e; }
+        
+        #chat-container { display: flex; flex-direction: column; flex: 1; max-width: 600px; width: 100%; margin: 0 auto; background: #1e1e1e; position: relative; }
+        
+        /* Красивая шапка чата */
+        #chat-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; background: #111; border-bottom: 1px solid #2c2c2e; font-size: 0.95rem; }
+        #current-user-display { font-weight: 600; color: #fff; }
+        #logout-button { background: none; border: none; color: #ff453a; cursor: pointer; font-size: 0.9rem; font-weight: 500; transition: opacity 0.2s; }
+        #logout-button:hover { opacity: 0.7; }
+
         #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+        
         .message { max-width: 75%; padding: 10px 14px; border-radius: 16px; font-size: 0.95rem; line-height: 1.4; word-break: break-word; position: relative; }
         .message.own { background-color: #007aff; align-self: flex-end; border-bottom-right-radius: 4px; }
         .message.other { background-color: #2c2c2e; align-self: flex-start; border-bottom-left-radius: 4px; }
         .message-meta { font-size: 0.75rem; opacity: 0.6; margin-bottom: 4px; display: flex; justify-content: space-between; gap: 10px; }
-        #typing-status { font-size: 0.8rem; opacity: 0.5; padding: 5px 20px; font-style: italic; min-height: 24px; background: #1e1e1e; max-width: 600px; width: 100%; margin: 0 auto; }
-        #input-container { display: flex; padding: 10px; background: #111; gap: 10px; max-width: 600px; width: 100%; margin: 0 auto; }
-        #message-input { flex: 1; padding: 12px; border-radius: 22px; border: none; background: #2c2c2e; color: #fff; font-size: 0.95rem; outline: none; }
-        #send-button { background: #007aff; color: #fff; border: none; padding: 0 20px; border-radius: 22px; font-size: 0.95rem; cursor: pointer; font-weight: bold; }
+        
+        #typing-status { font-size: 0.8rem; opacity: 0.5; padding: 5px 20px; font-style: italic; min-height: 24px; background: #1e1e1e; }
+        
+        #input-container { display: flex; padding: 10px 10px 15px 10px; background: #111; gap: 10px; }
+        #message-input { flex: 1; padding: 12px 18px; border-radius: 22px; border: none; background: #2c2c2e; color: #fff; font-size: 0.95rem; outline: none; }
+        #send-button { background: #007aff; color: #fff; border: none; padding: 0 22px; border-radius: 22px; font-size: 0.95rem; cursor: pointer; font-weight: bold; transition: background 0.2s; }
         #send-button:hover { background: #0063cc; }
+
+        /* Стильное окно авторизации прямо в теме приложения */
+        #auth-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #111; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 30px; z-index: 10; display: none; }
+        #auth-overlay h2 { margin-bottom: 20px; font-weight: 600; font-size: 1.4rem; }
+        #username-input { width: 100%; max-width: 300px; padding: 14px; border-radius: 12px; border: none; background: #2c2c2e; color: #fff; font-size: 1rem; text-align: center; outline: none; margin-bottom: 15px; }
+        #login-button { width: 100%; max-width: 300px; background: #007aff; color: #fff; border: none; padding: 14px; border-radius: 12px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        #login-button:hover { background: #0063cc; }
     </style>
 </head>
 <body>
 
     <div id="chat-container">
-        <div id="messages"></div>
-    </div>
-    
-    <!-- Индикатор печатания -->
-    <div id="typing-status"></div>
+        <!-- Шапка чата -->
+        <div id="chat-header">
+            <span id="current-user-display">Загрузка...</span>
+            <button id="logout-button">Выйти</button>
+        </div>
 
-    <div id="input-container">
-        <input type="text" id="message-input" placeholder="Сообщение..." autocomplete="off">
-        <button id="send-button">Отправить</button>
+        <!-- Окно ввода имени (Оверлей) -->
+        <div id="auth-overlay">
+            <h2>Представьтесь</h2>
+            <input type="text" id="username-input" placeholder="Ваше имя..." maxlength="20" autocomplete="off">
+            <button id="login-button">Войти в чат</button>
+        </div>
+
+        <!-- Список сообщений -->
+        <div id="messages"></div>
+        
+        <!-- Индикатор печатания -->
+        <div id="typing-status"></div>
+
+        <!-- Панель ввода -->
+        <div id="input-container">
+            <input type="text" id="message-input" placeholder="Сообщение..." autocomplete="off">
+            <button id="send-button">Отправить</button>
+        </div>
     </div>
 
     <script>
@@ -47,38 +80,71 @@
         const db = firebase.database().ref('chat_messages');
         const typingRef = firebase.database().ref('typing');
 
-        // --- ЛОГИКА АВТОРИЗАЦИИ ---
-        let username = localStorage.getItem('chat_username');
-        if (!username) {
-            username = prompt('Введите ваше имя для чата:') || 'Аноним';
-            localStorage.setItem('chat_username', username);
-        }
-
         const messagesBox = document.getElementById('messages');
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
+        const logoutButton = document.getElementById('logout-button');
+        
+        const authOverlay = document.getElementById('auth-overlay');
+        const usernameInput = document.getElementById('username-input');
+        const loginButton = document.getElementById('login-button');
+        const currentUserDisplay = document.getElementById('current-user-display');
 
+        let username = localStorage.getItem('chat_username');
         let lastMessageDateString = '';
         let typingTimeout;
+
+        // --- ПРОВЕРКА АВТОРИЗАЦИИ ---
+        function checkAuth() {
+            if (!username) {
+                authOverlay.style.display = 'flex';
+            } else {
+                authOverlay.style.display = 'none';
+                currentUserDisplay.innerText = username;
+                initChatListeners(); // Включаем слушатели базы только после авторизации
+            }
+        }
+
+        // Логика кнопки "Войти"
+        function handleLogin() {
+            const name = usernameInput.value.trim();
+            if (!name) return;
+            username = name;
+            localStorage.setItem('chat_username', username);
+            checkAuth();
+        }
+
+        loginButton.addEventListener('click', handleLogin);
+        usernameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleLogin();
+        });
+
+        // --- ЛОГИКА ВЫХОДА ---
+        logoutButton.addEventListener('click', () => {
+            if (username) {
+                typingRef.child(username).set(false);
+            }
+            localStorage.removeItem('chat_username');
+            location.reload();
+        });
 
         // --- ФУНКЦИЯ ОТПРАВКИ СООБЩЕНИЯ ---
         function sendMessage() {
             const text = messageInput.value.trim();
-            if (!text) return;
+            if (!text || !username) return;
 
             const newMessage = {
                 name: username,
                 text: text,
                 timestamp: firebase.database.ServerValue.TIMESTAMP,
                 views: {
-                    [username]: true // Автор сразу прочитал своё сообщение
+                    [username]: true
                 }
             };
 
             db.push(newMessage);
             messageInput.value = '';
             
-            // Сразу гасим статус печатания после отправки
             clearTimeout(typingTimeout);
             typingRef.child(username).set(false);
         }
@@ -90,6 +156,7 @@
 
         // --- ОТСЛЕЖИВАНИЕ ПЕЧАТАНИЯ ---
         messageInput.addEventListener('input', () => {
+            if (!username) return;
             typingRef.child(username).set(true);
 
             clearTimeout(typingTimeout);
@@ -98,84 +165,85 @@
             }, 2500);
         });
 
-        // Слушаем, кто сейчас печатает
-        typingRef.on('value', (snapshot) => {
-            const typingUsers = snapshot.val() || {};
-            // Фильтруем список: убираем себя и тех, у кого статус false
-            const activeTypers = Object.keys(typingUsers).filter(name => name !== username && typingUsers[name] === true);
-            const typingStatusDiv = document.getElementById('typing-status');
+        // --- ИНИЦИАЛИЗАЦИЯ СЛУШАТЕЛЕЙ FIREBASE ---
+        function initChatListeners() {
+            // Слушаем, кто сейчас печатает
+            typingRef.on('value', (snapshot) => {
+                const typingUsers = snapshot.val() || {};
+                const activeTypers = Object.keys(typingUsers).filter(name => name !== username && typingUsers[name] === true);
+                const typingStatusDiv = document.getElementById('typing-status');
 
-            if (activeTypers.length > 0) {
-                typingStatusDiv.innerText = activeTypers.length === 1 
-                    ? `${activeTypers[0]} печатает...` 
-                    : `${activeTypers.join(', ')} печатают...`;
-            } else {
-                typingStatusDiv.innerText = '';
-            }
-        });
+                if (activeTypers.length > 0) {
+                    typingStatusDiv.innerText = activeTypers.length === 1 
+                        ? `${activeTypers[0]} печатает...` 
+                        : `${activeTypers.join(', ')} печатают...`;
+                } else {
+                    typingStatusDiv.innerText = '';
+                }
+            });
 
-        // --- СЛУШАЕМ ОБЛАКО (ПОЛУЧЕНИЕ СООБЩЕНИЙ) ---
-        db.limitToLast(50).on('child_added', (snapshot) => {
-            const messageId = snapshot.key;
-            const data = snapshot.val();
-            
-            let timeString = '';
-            let dateString = '';
+            // Слушаем новые сообщения
+            db.limitToLast(50).on('child_added', (snapshot) => {
+                const messageId = snapshot.key;
+                const data = snapshot.val();
+                
+                let timeString = '';
+                let dateString = '';
 
-            if (data.timestamp) {
-                const date = new Date(data.timestamp);
-                timeString = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-                dateString = date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-            }
+                if (data.timestamp) {
+                    const date = new Date(data.timestamp);
+                    timeString = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                    dateString = date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+                }
 
-            // Отмечаем чужие сообщения как прочитанные нами
-            if (data.name !== username && (!data.views || !data.views[username])) {
-                db.child(messageId).child('views').child(username).set(true);
-            }
+                if (data.name !== username && (!data.views || !data.views[username])) {
+                    db.child(messageId).child('views').child(username).set(true);
+                }
 
-            // Рендер разделителя дат
-            if (dateString && dateString !== lastMessageDateString) {
-                messagesBox.innerHTML += `
-                    <div style="text-align: center; margin: 1.5rem 0 0.5rem; font-size: 0.8rem; opacity: 0.4; width: 100%;">
-                        — ${dateString} —
-                    </div>
-                `;
-                lastMessageDateString = dateString;
-            }
+                if (dateString && dateString !== lastMessageDateString) {
+                    messagesBox.innerHTML += `
+                        <div style="text-align: center; margin: 1.5rem 0 0.5rem; font-size: 0.8rem; opacity: 0.4; width: 100%;">
+                            — ${dateString} —
+                        </div>
+                    `;
+                    lastMessageDateString = dateString;
+                }
 
-            const messageClass = data.name === username ? 'own' : 'other';
-            
-            // Расчет галочек прочтения (если прочитал кто-то помимо автора — две галочки)
-            const viewsCount = data.views ? Object.keys(data.views).length : 1;
-            const ticks = viewsCount > 1 ? '✓✓' : '✓';
-            const statusTicks = messageClass === 'own' ? `<span class="ticks" style="margin-left: 5px; opacity: 0.6;">${ticks}</span>` : '';
-
-            messagesBox.innerHTML += `
-                <div id="msg-${messageId}" class="message ${messageClass}">
-                    <div class="message-meta">
-                        <span>${data.name}</span>
-                        <span>${timeString}${statusTicks}</span>
-                    </div>
-                    <div>${data.text}</div>
-                </div>
-            `;
-            messagesBox.scrollTop = messagesBox.scrollHeight;
-        });
-
-        // Слушаем обновления (изменения галочек в реальном времени)
-        db.limitToLast(50).on('child_changed', (snapshot) => {
-            const messageId = snapshot.key;
-            const data = snapshot.val();
-            
-            const msgElement = document.getElementById(`msg-${messageId}`);
-            if (msgElement && data.name === username) {
+                const messageClass = data.name === username ? 'own' : 'other';
                 const viewsCount = data.views ? Object.keys(data.views).length : 1;
                 const ticks = viewsCount > 1 ? '✓✓' : '✓';
+                const statusTicks = messageClass === 'own' ? `<span class="ticks" style="margin-left: 5px; opacity: 0.6;">${ticks}</span>` : '';
+
+                messagesBox.innerHTML += `
+                    <div id="msg-${messageId}" class="message ${messageClass}">
+                        <div class="message-meta">
+                            <span>${data.name}</span>
+                            <span>${timeString}${statusTicks}</span>
+                        </div>
+                        <div>${data.text}</div>
+                    </div>
+                `;
+                messagesBox.scrollTop = messagesBox.scrollHeight;
+            });
+
+            // Слушаем изменения галочек
+            db.limitToLast(50).on('child_changed', (snapshot) => {
+                const messageId = snapshot.key;
+                const data = snapshot.val();
                 
-                const ticksSpan = msgElement.querySelector('.ticks');
-                if (ticksSpan) ticksSpan.innerText = ticks;
-            }
-        });
+                const msgElement = document.getElementById(`msg-${messageId}`);
+                if (msgElement && data.name === username) {
+                    const viewsCount = data.views ? Object.keys(data.views).length : 1;
+                    const ticks = viewsCount > 1 ? '✓✓' : '✓';
+                    
+                    const ticksSpan = msgElement.querySelector('.ticks');
+                    if (ticksSpan) ticksSpan.innerText = ticks;
+                }
+            });
+        }
+
+        // Запуск проверки при старте страницы
+        checkAuth();
     </script>
 </body>
 </html>
