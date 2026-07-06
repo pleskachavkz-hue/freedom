@@ -111,7 +111,7 @@
         #send-button:active { transform: scale(0.95); }
         #typing-status { position: absolute; bottom: 4px; left: 40px; font-size: 0.75rem; color: #938f99; font-style: italic; pointer-events: none; height: 14px; line-height: 14px; }
         
-        #auth-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #141218; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 32px; z-index: 10; border-radius: 28px; }
+        #auth-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #141218; display: none; flex-direction: column; justify-content: center; align-items: center; padding: 32px; z-index: 10; border-radius: 28px; }
         #auth-overlay h2 { margin-bottom: 24px; font-weight: 500; font-size: 1.6rem; color: #fff; }
         #username-input { width: 100%; max-width: 320px; padding: 16px; border-radius: 16px; border: 1px solid #49454f; background: #1d1b20; color: #fff; font-size: 1rem; text-align: center; outline: none; margin-bottom: 20px; }
         #username-input:focus { border-color: #93c5fd; }
@@ -132,7 +132,7 @@
             </div>
         </div>
         <div id="search-bar">
-            <input type="text" id="search-input" placeholder="Поиск по сообщениям...">
+            <input type="text" id="search-input" placeholder="Поиск по загруженным сообщениям...">
         </div>
         <div id="auth-overlay">
             <h2>Представьтесь</h2>
@@ -152,13 +152,13 @@
     </div>
 
     <script>
-        // Секретная строка для активации панели администратора. Меняй на свою!
-        const ADMIN_SECRET_CODE = "admin1029"; 
+        const ADMIN_SECRET_CODE = 'admin1029';
+        const ADMIN_TOKEN_SALT = '@freedom-chat-admin';
+        const MESSAGES_LIMIT = 30;
+        const MAX_CACHE_SIZE = 500;
 
-        // --- КОНФИГУРАЦИЯ FIREBASE ---
-        // Рекомендуется использовать полный конфиг для безопасности
         const firebaseConfig = {
-            databaseURL: "https://freedom-9cedb-default-rtdb.firebaseio.com/"
+            databaseURL: 'https://freedom-9cedb-default-rtdb.firebaseio.com/'
         };
         firebase.initializeApp(firebaseConfig);
 
@@ -182,51 +182,291 @@
         const searchInput = document.getElementById('search-input');
 
         let username = localStorage.getItem('chat_username');
-        let isAdmin = localStorage.getItem('chat_is_admin') === 'true';
+        let expectedAdminToken = null;
+        let adminSessionToken = sessionStorage.getItem('admin_session_token');
         let typingTimeout;
         let localMessagesCache = [];
         let oldestLoadedTimestamp = null;
-        const MESSAGES_LIMIT = 30;
+        let lastAppendedDateString = '';
+        let lastKnownMessageKey = null;
+        let liveQuery = null;
+        let chatInitialized = false;
+        let initialLoadDone = false;
+
+        localStorage.removeItem('chat_is_admin');
+
+        async function computeAdminToken() {
+            const data = new TextEncoder().encode(ADMIN_SECRET_CODE + ADMIN_TOKEN_SALT);
+            const hash = await crypto.subtle.digest('SHA-256', data);
+            return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        function isAdminUser() {
+            return !!(adminSessionToken && expectedAdminToken && adminSessionToken === expectedAdminToken);
+        }
+
+        function getDateString(timestamp) {
+            if (typeof timestamp !== 'number') return '';
+            return new Date(timestamp).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+        }
+
+        function createDateDivider(dateString) {
+            const divider = document.createElement('div');
+            divider.className = 'date-divider';
+            divider.dataset.date = dateString;
+            const todayString = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+            divider.innerText = `— ${dateString === todayString ? 'Сегодня' : dateString} —`;
+            return divider;
+        }
+
+        function getNodeDate(node) {
+            if (!node) return '';
+            if (node.classList.contains('date-divider')) return node.dataset.date || '';
+            return node.dataset.msgDate || '';
+        }
+
+        function addToCache(entry, prepend) {
+            if (localMessagesCache.some(m => m.id === entry.id)) return;
+            if (prepend) {
+                localMessagesCache.unshift(entry);
+            } else {
+                localMessagesCache.push(entry);
+            }
+            if (localMessagesCache.length > MAX_CACHE_SIZE) {
+                localMessagesCache = prepend
+                    ? localMessagesCache.slice(0, MAX_CACHE_SIZE)
+                    : localMessagesCache.slice(-MAX_CACHE_SIZE);
+            }
+        }
+
+        function buildMessageNode(id, data) {
+            let timeString = '';
+            if (typeof data.timestamp === 'number') {
+                timeString = new Date(data.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+            }
+
+            let msgDiv;
+            if (data.isSystem) {
+                msgDiv = document.createElement('div');
+                msgDiv.id = id;
+                msgDiv.className = 'system-msg';
+                msgDiv.innerText = `${data.text} (${timeString})`;
+            } else {
+                const messageClass = data.name === username ? 'own' : 'other';
+                const viewsCount = data.views ? Object.keys(data.views).length : 1;
+                const ticks = viewsCount > 1 ? '✓✓' : '✓';
+
+                msgDiv = document.createElement('div');
+                msgDiv.id = id;
+                msgDiv.className = `message ${messageClass}`;
+                if (typeof data.timestamp === 'number') {
+                    msgDiv.dataset.msgDate = getDateString(data.timestamp);
+                }
+
+                const metaDiv = document.createElement('div');
+                metaDiv.className = 'message-meta';
+
+                const nameSpan = document.createElement('span');
+                nameSpan.innerText = data.name;
+
+                const timeSpan = document.createElement('span');
+                timeSpan.innerText = timeString + ' ';
+
+                if (messageClass === 'own') {
+                    const ticksSpan = document.createElement('span');
+                    ticksSpan.className = 'ticks';
+                    ticksSpan.style.marginLeft = '5px';
+                    ticksSpan.style.opacity = '0.7';
+                    ticksSpan.innerText = ticks;
+                    timeSpan.appendChild(ticksSpan);
+                }
+
+                metaDiv.appendChild(nameSpan);
+                metaDiv.appendChild(timeSpan);
+
+                const textDiv = document.createElement('div');
+                textDiv.innerText = data.text;
+
+                msgDiv.appendChild(metaDiv);
+                msgDiv.appendChild(textDiv);
+            }
+            return msgDiv;
+        }
+
+        function renderMessage(id, data, prepend = false) {
+            if (document.getElementById(id)) return;
+
+            const dateString = getDateString(data.timestamp);
+            const msgNode = buildMessageNode(id, data);
+
+            if (prepend) {
+                const insertBefore = loadMoreBtn.nextElementSibling;
+                if (dateString && insertBefore) {
+                    const topDate = getNodeDate(insertBefore);
+                    if (topDate && topDate !== dateString) {
+                        messagesBox.insertBefore(createDateDivider(dateString), insertBefore);
+                    }
+                } else if (dateString && !insertBefore) {
+                    messagesBox.insertBefore(createDateDivider(dateString), null);
+                }
+                messagesBox.insertBefore(msgNode, loadMoreBtn.nextElementSibling);
+            } else {
+                if (dateString && dateString !== lastAppendedDateString) {
+                    messagesBox.appendChild(createDateDivider(dateString));
+                    lastAppendedDateString = dateString;
+                }
+                messagesBox.appendChild(msgNode);
+            }
+        }
+
+        function cacheEntryFromMessage(id, data) {
+            return {
+                id,
+                name: data.name || '',
+                text: data.text || '',
+                isSystem: !!data.isSystem
+            };
+        }
+
+        function elementIdForMessage(id, data) {
+            return data.isSystem ? `sys-${id}` : `msg-${id}`;
+        }
+
+        function getOldestTimestamp(messages) {
+            const timestamps = messages
+                .map(m => m.data.timestamp)
+                .filter(t => typeof t === 'number');
+            return timestamps.length ? Math.min(...timestamps) : null;
+        }
+
+        function clearMessagesUI() {
+            Array.from(messagesBox.children).forEach(child => {
+                if (child !== loadMoreBtn) child.remove();
+            });
+            localMessagesCache = [];
+            oldestLoadedTimestamp = null;
+            lastAppendedDateString = '';
+            lastKnownMessageKey = null;
+            loadMoreBtn.style.display = 'none';
+            stopLiveListening();
+        }
+
+        function stopLiveListening() {
+            if (liveQuery) {
+                liveQuery.off('child_added', onNewMessage);
+                liveQuery = null;
+            }
+        }
+
+        function onNewMessage(snapshot) {
+            const messageId = snapshot.key;
+            const data = snapshot.val();
+            const elementId = elementIdForMessage(messageId, data);
+
+            if (document.getElementById(elementId)) return;
+
+            addToCache(cacheEntryFromMessage(elementId, data), false);
+            lastKnownMessageKey = messageId;
+
+            if (!data.isSystem && data.name !== username && (!data.views || !data.views[username])) {
+                db.child(messageId).child('views').child(username).set(true);
+            }
+
+            renderMessage(elementId, data, false);
+
+            if (!searchInput.value.trim()) {
+                messagesBox.scrollTop = messagesBox.scrollHeight;
+            }
+        }
+
+        function onMessageChanged(snapshot) {
+            const messageId = snapshot.key;
+            const data = snapshot.val();
+            if (data.isSystem) return;
+
+            const msgElement = document.getElementById(`msg-${messageId}`);
+            if (!msgElement || data.name !== username) return;
+
+            const viewsCount = data.views ? Object.keys(data.views).length : 1;
+            const ticks = viewsCount > 1 ? '✓✓' : '✓';
+            const ticksSpan = msgElement.querySelector('.ticks');
+            if (ticksSpan) ticksSpan.innerText = ticks;
+        }
+
+        function startLiveListening(afterKey) {
+            if (liveQuery) return;
+            liveQuery = afterKey ? db.orderByKey().startAfter(afterKey) : db;
+            liveQuery.on('child_added', onNewMessage);
+        }
+
+        function applySearchFilter() {
+            const query = searchInput.value.toLowerCase().trim();
+            const showAll = !query;
+
+            localMessagesCache.forEach(item => {
+                const element = document.getElementById(item.id);
+                if (!element) return;
+                if (showAll) {
+                    element.style.display = '';
+                    return;
+                }
+                const matches = item.isSystem
+                    ? item.text.toLowerCase().includes(query)
+                    : item.text.toLowerCase().includes(query) || item.name.toLowerCase().includes(query);
+                element.style.display = matches ? '' : 'none';
+            });
+
+            messagesBox.querySelectorAll('.date-divider').forEach(divider => {
+                if (showAll) {
+                    divider.style.display = '';
+                    return;
+                }
+                const next = divider.nextElementSibling;
+                divider.style.display = next && next.style.display !== 'none' ? '' : 'none';
+            });
+        }
 
         function checkAuth() {
             if (!username) {
                 authOverlay.style.display = 'flex';
                 searchBar.style.display = 'none';
                 adminPanelBtn.style.display = 'none';
-            } else {
-                authOverlay.style.display = 'none';
-                searchBar.style.display = 'block';
-                currentUserDisplay.innerText = username + (isAdmin ? " (Админ)" : "");
-                if (isAdmin) adminPanelBtn.style.display = 'block';
-                
-                initChatListeners();
-                initOnlinePresence();
-                loadInitialMessages();
+                return;
             }
+
+            authOverlay.style.display = 'none';
+            searchBar.style.display = 'block';
+            currentUserDisplay.innerText = username + (isAdminUser() ? ' (Админ)' : '');
+            adminPanelBtn.style.display = isAdminUser() ? 'block' : 'none';
+
+            if (chatInitialized) return;
+            chatInitialized = true;
+            initChatListeners();
+            initOnlinePresence();
+            loadInitialMessages();
         }
 
         function sendSystemMessage(text) {
-            const systemMessage = {
+            db.push({
                 name: 'Система',
                 text: text,
                 timestamp: firebase.database.ServerValue.TIMESTAMP,
                 isSystem: true
-            };
-            db.push(systemMessage);
+            });
         }
 
-        function handleLogin() {
+        async function handleLogin() {
             const name = usernameInput.value.trim();
             if (!name) return;
 
             if (name === ADMIN_SECRET_CODE) {
-                username = "Admin";
-                isAdmin = true;
-                localStorage.setItem('chat_is_admin', 'true');
+                adminSessionToken = await computeAdminToken();
+                sessionStorage.setItem('admin_session_token', adminSessionToken);
+                username = 'Admin';
             } else {
+                adminSessionToken = null;
+                sessionStorage.removeItem('admin_session_token');
                 username = name;
-                isAdmin = false;
-                localStorage.setItem('chat_is_admin', 'false');
             }
 
             localStorage.setItem('chat_username', username);
@@ -248,21 +488,31 @@
             typingRef.off();
             db.off();
             localStorage.removeItem('chat_username');
-            localStorage.removeItem('chat_is_admin');
+            sessionStorage.removeItem('admin_session_token');
             setTimeout(() => { location.reload(); }, 300);
         });
 
-        // Панель управления только для админа
-        adminPanelBtn.addEventListener('click', () => {
-            if (!isAdmin) return;
+        adminPanelBtn.addEventListener('click', async () => {
+            if (!isAdminUser()) return;
+
             const action = prompt('Введите команду:\n1 - Очистить историю чата\n2 - Сбросить онлайн счетчики');
             if (action === '1') {
+                const secret = prompt('Подтвердите код администратора:');
+                if (secret !== ADMIN_SECRET_CODE) {
+                    alert('Неверный код');
+                    return;
+                }
                 if (confirm('Вы уверены, что хотите полностью удалить историю сообщений?')) {
                     db.remove().then(() => {
                         sendSystemMessage('Администратор очистил историю чата');
                     });
                 }
             } else if (action === '2') {
+                const secret = prompt('Подтвердите код администратора:');
+                if (secret !== ADMIN_SECRET_CODE) {
+                    alert('Неверный код');
+                    return;
+                }
                 onlineRef.remove();
                 typingRef.remove();
                 alert('Счетчики сброшены');
@@ -273,13 +523,12 @@
             const text = messageInput.value.trim();
             if (!text || !username) return;
 
-            const newMessage = {
+            db.push({
                 name: username,
                 text: text,
                 timestamp: firebase.database.ServerValue.TIMESTAMP,
                 views: { [username]: true }
-            };
-            db.push(newMessage);
+            });
             messageInput.value = '';
             clearTimeout(typingTimeout);
             typingRef.child(username).set(false);
@@ -310,166 +559,7 @@
             });
         }
 
-        // --- ЛОКАЛЬНЫЙ ПОИСК ПО ВСЕМ ЗАГРУЖЕННЫМ ---
-        searchInput.addEventListener('input', () => {
-            const query = searchInput.value.toLowerCase().trim();
-            localMessagesCache.forEach(item => {
-                const element = document.getElementById(item.id);
-                if (!element) return;
-                const matches = item.isSystem 
-                    ? item.text.toLowerCase().includes(query) 
-                    : item.text.toLowerCase().includes(query) || item.name.toLowerCase().includes(query);
-                element.style.display = matches ? '' : 'none';
-            });
-        });
-
-        // --- РЕНДЕР СООБЩЕНИЙ ЧЕРЕЗ DOM ---
-        function renderMessageNode(id, data, prepend = false) {
-            if (document.getElementById(id)) return; // Избегаем дубликатов
-
-            let timeString = '';
-            if (data.timestamp) {
-                const date = new Date(data.timestamp);
-                timeString = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-            }
-
-            let msgDiv;
-            if (data.isSystem) {
-                msgDiv = document.createElement('div');
-                msgDiv.id = id;
-                msgDiv.className = 'system-msg';
-                msgDiv.innerText = `${data.text} (${timeString})`;
-            } else {
-                const messageClass = data.name === username ? 'own' : 'other';
-                const viewsCount = data.views ? Object.keys(data.views).length : 1;
-                const ticks = viewsCount > 1 ? '✓✓' : '✓';
-
-                msgDiv = document.createElement('div');
-                msgDiv.id = id;
-                msgDiv.className = `message ${messageClass}`;
-
-                const metaDiv = document.createElement('div');
-                metaDiv.className = 'message-meta';
-
-                const nameSpan = document.createElement('span');
-                nameSpan.innerText = data.name;
-
-                const timeSpan = document.createElement('span');
-                timeSpan.innerText = timeString + ' ';
-
-                if (messageClass === 'own') {
-                    const ticksSpan = document.createElement('span');
-                    ticksSpan.className = 'ticks';
-                    ticksSpan.style.marginLeft = '5px';
-                    ticksSpan.style.opacity = '0.7';
-                    ticksSpan.innerText = ticks;
-                    timeSpan.appendChild(ticksSpan);
-                }
-
-                metaDiv.appendChild(nameSpan);
-                metaDiv.appendChild(timeSpan);
-
-                const textDiv = document.createElement('div');
-                textDiv.innerText = data.text;
-
-                msgDiv.appendChild(metaDiv);
-                msgDiv.appendChild(textDiv);
-            }
-
-            if (prepend) {
-                // Вставляем сразу после кнопки подгрузки
-                loadMoreBtn.after(msgDiv);
-            } else {
-                messagesBox.appendChild(msgDiv);
-            }
-        }
-
-        // --- ПОДГРУЗКА ПОРЦИЯМИ (Пагинация) ---
-        function loadInitialMessages() {
-            db.limitToLast(MESSAGES_LIMIT).once('value', (snapshot) => {
-                const messages = [];
-                snapshot.forEach(child => {
-                    messages.push({ id: child.key, data: child.val() });
-                });
-
-                if (messages.length > 0) {
-                    oldestLoadedTimestamp = messages[0].data.timestamp;
-                    if (messages.length === MESSAGES_LIMIT) {
-                        loadMoreBtn.style.display = 'block';
-                    }
-                }
-                
-                // Слушаем новые сообщения в реальном времени
-                startLiveListening();
-            });
-        }
-
-        loadMoreBtn.addEventListener('click', () => {
-            if (!oldestLoadedTimestamp) return;
-
-            db.orderByChild('timestamp')
-              .endAt(oldestLoadedTimestamp - 1)
-              .limitToLast(MESSAGES_LIMIT)
-              .once('value', (snapshot) => {
-                  const messages = [];
-                  snapshot.forEach(child => {
-                      messages.push({ id: child.key, data: child.val() });
-                  });
-
-                  if (messages.length === 0) {
-                      loadMoreBtn.style.display = 'none';
-                      return;
-                  }
-
-                  oldestLoadedTimestamp = messages[0].data.timestamp;
-                  if (messages.length < MESSAGES_LIMIT) {
-                      loadMoreBtn.style.display = 'none';
-                  }
-
-                  // Рендерим старые сообщения сверху в обратном порядке
-                  messages.reverse().forEach(item => {
-                      const elementId = item.data.isSystem ? `sys-${item.id}` : `msg-${item.id}`;
-                      localMessagesCache.unshift({ id: elementId, name: item.data.name || '', text: item.data.text || '', isSystem: !!item.data.isSystem });
-                      renderMessageNode(elementId, item.data, true);
-                  });
-              });
-        });
-
-        function startLiveListening() {
-            db.limitToLast(MESSAGES_LIMIT).on('child_added', (snapshot) => {
-                const messageId = snapshot.key;
-                const data = snapshot.val();
-                const elementId = data.isSystem ? `sys-${messageId}` : `msg-${messageId}`;
-
-                if (localMessagesCache.some(m => m.id === elementId)) return;
-
-                localMessagesCache.push({ id: elementId, name: data.name || '', text: data.text || '', isSystem: !!data.isSystem });
-                
-                if (!data.isSystem && data.name !== username && (!data.views || !data.views[username])) {
-                    db.child(messageId).child('views').child(username).set(true);
-                }
-
-                renderMessageNode(elementId, data, false);
-
-                if (!searchInput.value.trim()) {
-                    messagesBox.scrollTop = messagesBox.scrollHeight;
-                }
-            });
-
-            db.limitToLast(MESSAGES_LIMIT).on('child_changed', (snapshot) => {
-                const messageId = snapshot.key;
-                const data = snapshot.val();
-                if (data.isSystem) return;
-
-                const msgElement = document.getElementById(`msg-${messageId}`);
-                if (msgElement && data.name === username) {
-                    const viewsCount = data.views ? Object.keys(data.views).length : 1;
-                    const ticks = viewsCount > 1 ? '✓✓' : '✓';
-                    const ticksSpan = msgElement.querySelector('.ticks');
-                    if (ticksSpan) ticksSpan.innerText = ticks;
-                }
-            });
-        }
+        searchInput.addEventListener('input', applySearchFilter);
 
         function initChatListeners() {
             typingRef.on('value', (snapshot) => {
@@ -477,26 +567,106 @@
                 const activeTypers = Object.keys(typingUsers).filter(name => name !== username && typingUsers[name] === true);
                 const typingStatusDiv = document.getElementById('typing-status');
                 if (activeTypers.length > 0) {
-                    typingStatusDiv.innerText = activeTypers.length === 1 ? `${activeTypers[0]} печатает...` : `${activeTypers.join(', ')} печатают...`;
+                    typingStatusDiv.innerText = activeTypers.length === 1
+                        ? `${activeTypers[0]} печатает...`
+                        : `${activeTypers.join(', ')} печатают...`;
                 } else {
                     typingStatusDiv.innerText = '';
                 }
             });
 
+            db.on('child_changed', onMessageChanged);
+
             db.on('value', (snapshot) => {
                 if (!snapshot.exists()) {
-                    // Если база стерта админом, очищаем интерфейс на лету
-                    const keepBtn = loadMoreBtn.cloneNode(true);
-                    messagesBox.innerHTML = '';
-                    messagesBox.appendChild(keepBtn);
-                    localMessagesCache = [];
-                    oldestLoadedTimestamp = null;
-                    loadMoreBtn.style.display = 'none';
+                    clearMessagesUI();
+                    if (initialLoadDone) {
+                        startLiveListening(null);
+                    }
                 }
             });
         }
 
-        checkAuth();
+        function loadInitialMessages() {
+            db.limitToLast(MESSAGES_LIMIT).once('value', (snapshot) => {
+                const messages = [];
+                snapshot.forEach(child => {
+                    messages.push({ id: child.key, data: child.val() });
+                });
+
+                oldestLoadedTimestamp = getOldestTimestamp(messages);
+                loadMoreBtn.style.display = messages.length === MESSAGES_LIMIT ? 'block' : 'none';
+
+                messages.forEach(item => {
+                    const elementId = elementIdForMessage(item.id, item.data);
+                    addToCache(cacheEntryFromMessage(elementId, item.data), false);
+                    renderMessage(elementId, item.data, false);
+
+                    if (!item.data.isSystem && item.data.name !== username && (!item.data.views || !item.data.views[username])) {
+                        db.child(item.id).child('views').child(username).set(true);
+                    }
+                });
+
+                if (messages.length > 0) {
+                    lastKnownMessageKey = messages[messages.length - 1].id;
+                }
+
+                messagesBox.scrollTop = messagesBox.scrollHeight;
+                stopLiveListening();
+                startLiveListening(lastKnownMessageKey);
+                initialLoadDone = true;
+            });
+        }
+
+        function handleLoadMore() {
+            if (typeof oldestLoadedTimestamp !== 'number') return;
+
+            const prevScrollHeight = messagesBox.scrollHeight;
+            const prevScrollTop = messagesBox.scrollTop;
+
+            db.orderByChild('timestamp')
+                .endAt(oldestLoadedTimestamp - 1)
+                .limitToLast(MESSAGES_LIMIT)
+                .once('value', (snapshot) => {
+                    const messages = [];
+                    snapshot.forEach(child => {
+                        messages.push({ id: child.key, data: child.val() });
+                    });
+
+                    if (messages.length === 0) {
+                        loadMoreBtn.style.display = 'none';
+                        return;
+                    }
+
+                    oldestLoadedTimestamp = getOldestTimestamp(messages);
+                    if (messages.length < MESSAGES_LIMIT || typeof oldestLoadedTimestamp !== 'number') {
+                        loadMoreBtn.style.display = 'none';
+                    }
+
+                    messages.forEach(item => {
+                        const elementId = elementIdForMessage(item.id, item.data);
+                        addToCache(cacheEntryFromMessage(elementId, item.data), true);
+                        renderMessage(elementId, item.data, true);
+                    });
+
+                    requestAnimationFrame(() => {
+                        messagesBox.scrollTop = prevScrollTop + (messagesBox.scrollHeight - prevScrollHeight);
+                    });
+
+                    applySearchFilter();
+                });
+        }
+
+        loadMoreBtn.addEventListener('click', handleLoadMore);
+
+        computeAdminToken().then(token => {
+            expectedAdminToken = token;
+            if (adminSessionToken && adminSessionToken !== expectedAdminToken) {
+                adminSessionToken = null;
+                sessionStorage.removeItem('admin_session_token');
+            }
+            checkAuth();
+        });
     </script>
 </body>
 </html>

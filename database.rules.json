@@ -1,0 +1,17 @@
+{
+  "rules": {
+    "chat_messages": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["timestamp"]
+    },
+    "typing": {
+      ".read": true,
+      ".write": true
+    },
+    "online_users": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}
