@@ -517,9 +517,12 @@
                     const key = snapshot.key;
                     const val = snapshot.val();
                     const idx = this.messages.findIndex(m => m.id === key);
-                    if (idx !== -1) {
-                        this.messages.splice(idx, 1, { ...this.messages[idx], views: val.views });
+                    if (idx === -1) return;
+                    if (!val) {
+                        this.messages.splice(idx, 1);
+                        return;
                     }
+                    this.messages.splice(idx, 1, { id: key, ...val });
                 }));
 
                 this.addUnsubscribe(onValue(dbRef, (snapshot) => {
