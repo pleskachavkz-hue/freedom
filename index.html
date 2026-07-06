@@ -7,12 +7,10 @@
     <!-- Подключаем Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-    <!-- Google Fonts для Material M3 -->
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: 'Roboto', sans-serif;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
             background-color: #141218;
             color: #e6e1e5;
             display: flex;
@@ -117,6 +115,16 @@
         #username-input:focus { border-color: #93c5fd; }
         #login-button { width: 100%; max-width: 320px; background: #384358; color: #e3ebf8; border: none; padding: 16px; border-radius: 16px; font-size: 1rem; font-weight: 500; cursor: pointer; transition: background 0.2s; }
         #login-button:hover { background: #46546f; }
+        #mirror-links {
+            margin-top: 20px;
+            font-size: 0.75rem;
+            color: #938f99;
+            text-align: center;
+            max-width: 320px;
+            line-height: 1.5;
+        }
+        #mirror-links a { color: #93c5fd; text-decoration: none; }
+        #mirror-links a:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -138,6 +146,7 @@
             <h2>Представьтесь</h2>
             <input type="text" id="username-input" placeholder="Ваше имя..." maxlength="20" autocomplete="off">
             <button id="login-button">Войти в чат</button>
+            <div id="mirror-links"></div>
         </div>
         <div id="messages">
             <button id="load-more-btn" style="display: none;">Загрузить более старые сообщения</button>
@@ -156,6 +165,12 @@
         const ADMIN_TOKEN_SALT = '@freedom-chat-admin';
         const MESSAGES_LIMIT = 30;
         const MAX_CACHE_SIZE = 500;
+
+        // Зеркала UI — добавьте свои URL после деплоя на другой хостинг
+        const STATIC_MIRRORS = [
+            'https://pleskachavkz-hue.github.io/freedom/',
+            // 'https://freedom.pages.dev/',
+        ];
 
         const firebaseConfig = {
             databaseURL: 'https://freedom-9cedb-default-rtdb.firebaseio.com/'
@@ -180,6 +195,7 @@
         const onlineCountSpan = document.getElementById('online-count');
         const searchBar = document.getElementById('search-bar');
         const searchInput = document.getElementById('search-input');
+        const mirrorLinks = document.getElementById('mirror-links');
 
         let username = localStorage.getItem('chat_username');
         let expectedAdminToken = null;
@@ -194,6 +210,26 @@
         let initialLoadDone = false;
 
         localStorage.removeItem('chat_is_admin');
+
+        function renderMirrorLinks() {
+            const current = window.location.href.split('?')[0].split('#')[0];
+            const mirrors = STATIC_MIRRORS.filter(url => url && url.split('?')[0] !== current);
+            if (mirrors.length === 0) {
+                mirrorLinks.innerText = '';
+                return;
+            }
+            mirrorLinks.innerHTML = 'Если сайт не открывается, попробуйте зеркало: ' +
+                mirrors.map((url, i) => `<a href="${url}" target="_blank" rel="noopener">#${i + 1}</a>`).join(' · ');
+        }
+
+        function clearChatHistory() {
+            return db.once('value').then(snapshot => {
+                if (!snapshot.exists()) return;
+                const updates = {};
+                snapshot.forEach(child => { updates[child.key] = null; });
+                return db.update(updates);
+            });
+        }
 
         async function computeAdminToken() {
             const data = new TextEncoder().encode(ADMIN_SECRET_CODE + ADMIN_TOKEN_SALT);
@@ -503,8 +539,10 @@
                     return;
                 }
                 if (confirm('Вы уверены, что хотите полностью удалить историю сообщений?')) {
-                    db.remove().then(() => {
+                    clearChatHistory().then(() => {
                         sendSystemMessage('Администратор очистил историю чата');
+                    }).catch((error) => {
+                        alert('Ошибка при очистке: ' + error.message);
                     });
                 }
             } else if (action === '2') {
@@ -658,6 +696,8 @@
         }
 
         loadMoreBtn.addEventListener('click', handleLoadMore);
+
+        renderMirrorLinks();
 
         computeAdminToken().then(token => {
             expectedAdminToken = token;

@@ -2,16 +2,32 @@
   "rules": {
     "chat_messages": {
       ".read": true,
-      ".write": true,
-      ".indexOn": ["timestamp"]
+      ".write": false,
+      ".indexOn": ["timestamp"],
+      "$messageId": {
+        ".write": "!data.exists() || newData.val() === null || (data.child('name').val() === newData.child('name').val() && data.child('text').val() === newData.child('text').val() && data.child('timestamp').val() === newData.child('timestamp').val())",
+        ".validate": "newData.val() === null || (newData.hasChildren(['name', 'text', 'timestamp']) && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 20 && newData.child('text').isString() && newData.child('text').val().length > 0 && newData.child('text').val().length <= 2000 && (!newData.hasChild('isSystem') || newData.child('isSystem').isBoolean()))",
+        "views": {
+          "$viewer": {
+            ".write": "!data.exists()",
+            ".validate": "newData.val() === true"
+          }
+        }
+      }
     },
     "typing": {
       ".read": true,
-      ".write": true
+      "$user": {
+        ".write": "newData.isBoolean() || newData.val() === null",
+        ".validate": "newData.val() === null || newData.isBoolean()"
+      }
     },
     "online_users": {
       ".read": true,
-      ".write": true
+      "$user": {
+        ".write": "newData.val() === true || newData.val() === null",
+        ".validate": "newData.val() === true || newData.val() === null"
+      }
     }
   }
 }
