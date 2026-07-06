@@ -4,9 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Freedom Chat Pro</title>
-    <!-- Подключаем Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -51,17 +48,9 @@
             cursor: pointer;
             font-size: 0.9rem;
             font-weight: 500;
-            display: none;
         }
-        #logout-button {
-            background: none;
-            border: none;
-            color: #f28482;
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 500;
-        }
-        #search-bar { background: #25232a; padding: 12px 24px; border-bottom: 1px solid #35333a; display: none; }
+        #logout-button { background: none; border: none; color: #f28482; cursor: pointer; font-size: 0.9rem; font-weight: 500; }
+        #search-bar { background: #25232a; padding: 12px 24px; border-bottom: 1px solid #35333a; }
         #search-input {
             width: 100%;
             padding: 10px 16px;
@@ -74,8 +63,6 @@
         }
         #search-input:focus { border-color: #93c5fd; }
         #messages { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 12px; }
-        
-        /* Кнопка подгрузки истории */
         #load-more-btn {
             align-self: center;
             background: #2d2b32;
@@ -89,17 +76,14 @@
             transition: background 0.2s;
         }
         #load-more-btn:hover { background: #35333a; }
-
         .message { max-width: 75%; padding: 12px 16px; font-size: 0.95rem; line-height: 1.4; word-break: break-word; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.15); }
         .message.own { background-color: #384358; color: #e3ebf8; align-self: flex-end; border-radius: 20px 20px 4px 20px; }
         .message.other { background-color: #2a282f; color: #e6e1e5; align-self: flex-start; border-radius: 20px 20px 20px 4px; }
         .message-meta { font-size: 0.75rem; opacity: 0.6; margin-bottom: 4px; display: flex; justify-content: space-between; gap: 12px; font-weight: 500; }
         .message.own .message-meta { color: #adc6ff; }
         .message.other .message-meta { color: #cac4d0; }
-        
         .date-divider { text-align: center; margin: 1rem 0; font-size: 0.8rem; font-weight: 500; color: #938f99; width: 100%; }
         .system-msg { text-align: center; margin: 0.5rem 0; font-size: 0.85rem; font-style: italic; width: 100%; color: #625b71; }
-        
         #bottom-bar { position: relative; background: #25232a; padding: 16px 24px 24px 24px; border-top: 1px solid #35333a; }
         #input-container { display: flex; gap: 12px; position: relative; align-items: center; }
         #message-input { flex: 1; padding: 14px 20px; border-radius: 28px; border: 1px solid #49454f; background: #2d2b32; color: #fff; font-size: 0.95rem; outline: none; }
@@ -108,605 +92,494 @@
         #send-button:hover { background: #46546f; }
         #send-button:active { transform: scale(0.95); }
         #typing-status { position: absolute; bottom: 4px; left: 40px; font-size: 0.75rem; color: #938f99; font-style: italic; pointer-events: none; height: 14px; line-height: 14px; }
-        
-        #auth-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #141218; display: none; flex-direction: column; justify-content: center; align-items: center; padding: 32px; z-index: 10; border-radius: 28px; }
+        #auth-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #141218; flex-direction: column; justify-content: center; align-items: center; padding: 32px; z-index: 10; border-radius: 28px; }
         #auth-overlay h2 { margin-bottom: 24px; font-weight: 500; font-size: 1.6rem; color: #fff; }
         #username-input { width: 100%; max-width: 320px; padding: 16px; border-radius: 16px; border: 1px solid #49454f; background: #1d1b20; color: #fff; font-size: 1rem; text-align: center; outline: none; margin-bottom: 20px; }
         #username-input:focus { border-color: #93c5fd; }
         #login-button { width: 100%; max-width: 320px; background: #384358; color: #e3ebf8; border: none; padding: 16px; border-radius: 16px; font-size: 1rem; font-weight: 500; cursor: pointer; transition: background 0.2s; }
         #login-button:hover { background: #46546f; }
-        #mirror-links {
-            margin-top: 20px;
-            font-size: 0.75rem;
-            color: #938f99;
-            text-align: center;
-            max-width: 320px;
-            line-height: 1.5;
-        }
+        #mirror-links { margin-top: 20px; font-size: 0.75rem; color: #938f99; text-align: center; max-width: 320px; line-height: 1.5; }
         #mirror-links a { color: #93c5fd; text-decoration: none; }
         #mirror-links a:hover { text-decoration: underline; }
+        [x-cloak] { display: none !important; }
     </style>
 </head>
-<body>
+<body x-data="chatApp" x-cloak>
+
     <div id="chat-container">
         <div id="chat-header">
             <div id="header-info">
-                <span id="current-user-display">Загрузка...</span>
-                <span id="online-count">онлайн: 0</span>
+                <span id="current-user-display" x-text="username === 'Admin' ? '👑 Admin' : username || 'Загрузка...'"></span>
+                <span id="online-count" x-text="'онлайн: ' + onlineCount"></span>
             </div>
             <div id="header-buttons">
-                <button id="admin-panel-btn">Управление</button>
-                <button id="logout-button">Выйти</button>
+                <button id="admin-panel-btn" x-show="isAdmin" @click="handleAdminAction()">Управление</button>
+                <button id="logout-button" x-show="username" @click="handleLogout()">Выйти</button>
             </div>
         </div>
-        <div id="search-bar">
-            <input type="text" id="search-input" placeholder="Поиск по загруженным сообщениям...">
+
+        <div id="search-bar" x-show="username">
+            <input type="text" id="search-input" x-model="searchQuery" placeholder="Поиск по загруженным сообщениям...">
         </div>
-        <div id="auth-overlay">
+
+        <div id="auth-overlay" x-show="!username" style="display: flex;">
             <h2>Представьтесь</h2>
-            <input type="text" id="username-input" placeholder="Ваше имя..." maxlength="20" autocomplete="off">
-            <button id="login-button">Войти в чат</button>
-            <div id="mirror-links"></div>
+            <input type="text" id="username-input" x-model="usernameInput" @keyup.enter="handleLogin()" placeholder="Ваше имя..." maxlength="20" autocomplete="off">
+            <button id="login-button" @click="handleLogin()">Войти в чат</button>
+            <div id="mirror-links" x-html="mirrorLinksHTML"></div>
         </div>
+
         <div id="messages">
-            <button id="load-more-btn" style="display: none;">Загрузить более старые сообщения</button>
+            <button id="load-more-btn" x-show="showLoadMore" @click="handleLoadMore()">Загрузить более старые сообщения</button>
+
+            <template x-for="item in filteredMessages" :key="item.id">
+                <div>
+                    <template x-if="item.isDivider">
+                        <div class="date-divider" x-text="'— ' + item.text + ' —'"></div>
+                    </template>
+                    <template x-if="!item.isDivider && item.isSystem">
+                        <div class="system-msg" x-text="item.text + ' (' + formatTime(item.timestamp) + ')'"></div>
+                    </template>
+                    <template x-if="!item.isDivider && !item.isSystem">
+                        <div class="message" :class="item.name === username ? 'own' : 'other'">
+                            <div class="message-meta">
+                                <span x-text="item.name"></span>
+                                <span>
+                                    <span x-text="formatTime(item.timestamp) + ' '"></span>
+                                    <span x-if="item.name === username" style="margin-left:5px; opacity:0.7;" x-text="Object.keys(item.views || {}).length > 1 ? '✓✓' : '✓'"></span>
+                                </span>
+                            </div>
+                            <div x-text="item.text"></div>
+                        </div>
+                    </template>
+                </div>
+            </template>
         </div>
+
         <div id="bottom-bar">
             <div id="input-container">
-                <input type="text" id="message-input" placeholder="Сообщение..." autocomplete="off">
-                <button id="send-button">➤</button>
+                <input type="text" id="message-input" x-model="messageInput" @input="handleTyping()" @keyup.enter="sendMessage()" placeholder="Сообщение..." autocomplete="off">
+                <button id="send-button" @click="sendMessage()">➤</button>
             </div>
-            <div id="typing-status"></div>
+            <div id="typing-status" x-text="typingStatusText"></div>
         </div>
     </div>
 
-    <script>
-        const ADMIN_SECRET_CODE = 'admin1029';
+    <script type="module">
+        import Alpine from 'https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/module.esm.js';
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import {
+            getDatabase, ref, push, set, remove, get, update,
+            onChildAdded, onChildChanged, onValue,
+            serverTimestamp, query, orderByChild, orderByKey,
+            limitToLast, endAt, startAfter, onDisconnect
+        } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js';
+
+        const firebaseConfig = { databaseURL: 'https://freedom-9cedb-default-rtdb.firebaseio.com/' };
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        const dbRef = ref(database, 'chat_messages');
+        const typingRef = ref(database, 'typing');
+        const onlineRef = ref(database, 'online_users');
+        const connectedRef = ref(database, '.info/connected');
+
+        const ADMIN_HASH_EXPECTED = 'e2d8b4c09b83b38df9611b0e3b97b0a373ff255b719460599a039d5e306126bb';
         const ADMIN_TOKEN_SALT = '@freedom-chat-admin';
         const MESSAGES_LIMIT = 30;
         const MAX_CACHE_SIZE = 500;
-
-        // Зеркала UI — добавьте свои URL после деплоя на другой хостинг
-        const STATIC_MIRRORS = [
-            'https://pleskachavkz-hue.github.io/freedom/',
-            // 'https://freedom.pages.dev/',
-        ];
-
-        const firebaseConfig = {
-            databaseURL: 'https://freedom-9cedb-default-rtdb.firebaseio.com/'
-        };
-        firebase.initializeApp(firebaseConfig);
-
-        const db = firebase.database().ref('chat_messages');
-        const typingRef = firebase.database().ref('typing');
-        const onlineRef = firebase.database().ref('online_users');
-        const amOnlineRef = firebase.database().ref('.info/connected');
-
-        const messagesBox = document.getElementById('messages');
-        const loadMoreBtn = document.getElementById('load-more-btn');
-        const messageInput = document.getElementById('message-input');
-        const sendButton = document.getElementById('send-button');
-        const logoutButton = document.getElementById('logout-button');
-        const adminPanelBtn = document.getElementById('admin-panel-btn');
-        const authOverlay = document.getElementById('auth-overlay');
-        const usernameInput = document.getElementById('username-input');
-        const loginButton = document.getElementById('login-button');
-        const currentUserDisplay = document.getElementById('current-user-display');
-        const onlineCountSpan = document.getElementById('online-count');
-        const searchBar = document.getElementById('search-bar');
-        const searchInput = document.getElementById('search-input');
-        const mirrorLinks = document.getElementById('mirror-links');
-
-        let username = localStorage.getItem('chat_username');
-        let expectedAdminToken = null;
-        let adminSessionToken = sessionStorage.getItem('admin_session_token');
-        let typingTimeout;
-        let localMessagesCache = [];
-        let oldestLoadedTimestamp = null;
-        let lastAppendedDateString = '';
-        let lastKnownMessageKey = null;
-        let liveQuery = null;
-        let chatInitialized = false;
-        let initialLoadDone = false;
-
-        localStorage.removeItem('chat_is_admin');
-
-        function renderMirrorLinks() {
-            const current = window.location.href.split('?')[0].split('#')[0];
-            const mirrors = STATIC_MIRRORS.filter(url => url && url.split('?')[0] !== current);
-            if (mirrors.length === 0) {
-                mirrorLinks.innerText = '';
-                return;
-            }
-            mirrorLinks.innerHTML = 'Если сайт не открывается, попробуйте зеркало: ' +
-                mirrors.map((url, i) => `<a href="${url}" target="_blank" rel="noopener">#${i + 1}</a>`).join(' · ');
-        }
-
-        function clearChatHistory() {
-            return db.once('value').then(snapshot => {
-                if (!snapshot.exists()) return;
-                const updates = {};
-                snapshot.forEach(child => { updates[child.key] = null; });
-                return db.update(updates);
-            });
-        }
-
-        async function computeAdminToken() {
-            const data = new TextEncoder().encode(ADMIN_SECRET_CODE + ADMIN_TOKEN_SALT);
-            const hash = await crypto.subtle.digest('SHA-256', data);
-            return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
-        }
-
-        function isAdminUser() {
-            return !!(adminSessionToken && expectedAdminToken && adminSessionToken === expectedAdminToken);
-        }
-
-        function getDateString(timestamp) {
-            if (typeof timestamp !== 'number') return '';
-            return new Date(timestamp).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-        }
-
-        function createDateDivider(dateString) {
-            const divider = document.createElement('div');
-            divider.className = 'date-divider';
-            divider.dataset.date = dateString;
-            const todayString = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-            divider.innerText = `— ${dateString === todayString ? 'Сегодня' : dateString} —`;
-            return divider;
-        }
-
-        function getNodeDate(node) {
-            if (!node) return '';
-            if (node.classList.contains('date-divider')) return node.dataset.date || '';
-            return node.dataset.msgDate || '';
-        }
-
-        function addToCache(entry, prepend) {
-            if (localMessagesCache.some(m => m.id === entry.id)) return;
-            if (prepend) {
-                localMessagesCache.unshift(entry);
-            } else {
-                localMessagesCache.push(entry);
-            }
-            if (localMessagesCache.length > MAX_CACHE_SIZE) {
-                localMessagesCache = prepend
-                    ? localMessagesCache.slice(0, MAX_CACHE_SIZE)
-                    : localMessagesCache.slice(-MAX_CACHE_SIZE);
-            }
-        }
-
-        function buildMessageNode(id, data) {
-            let timeString = '';
-            if (typeof data.timestamp === 'number') {
-                timeString = new Date(data.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-            }
-
-            let msgDiv;
-            if (data.isSystem) {
-                msgDiv = document.createElement('div');
-                msgDiv.id = id;
-                msgDiv.className = 'system-msg';
-                msgDiv.innerText = `${data.text} (${timeString})`;
-            } else {
-                const messageClass = data.name === username ? 'own' : 'other';
-                const viewsCount = data.views ? Object.keys(data.views).length : 1;
-                const ticks = viewsCount > 1 ? '✓✓' : '✓';
-
-                msgDiv = document.createElement('div');
-                msgDiv.id = id;
-                msgDiv.className = `message ${messageClass}`;
-                if (typeof data.timestamp === 'number') {
-                    msgDiv.dataset.msgDate = getDateString(data.timestamp);
-                }
-
-                const metaDiv = document.createElement('div');
-                metaDiv.className = 'message-meta';
-
-                const nameSpan = document.createElement('span');
-                nameSpan.innerText = data.name;
-
-                const timeSpan = document.createElement('span');
-                timeSpan.innerText = timeString + ' ';
-
-                if (messageClass === 'own') {
-                    const ticksSpan = document.createElement('span');
-                    ticksSpan.className = 'ticks';
-                    ticksSpan.style.marginLeft = '5px';
-                    ticksSpan.style.opacity = '0.7';
-                    ticksSpan.innerText = ticks;
-                    timeSpan.appendChild(ticksSpan);
-                }
-
-                metaDiv.appendChild(nameSpan);
-                metaDiv.appendChild(timeSpan);
-
-                const textDiv = document.createElement('div');
-                textDiv.innerText = data.text;
-
-                msgDiv.appendChild(metaDiv);
-                msgDiv.appendChild(textDiv);
-            }
-            return msgDiv;
-        }
-
-        function renderMessage(id, data, prepend = false) {
-            if (document.getElementById(id)) return;
-
-            const dateString = getDateString(data.timestamp);
-            const msgNode = buildMessageNode(id, data);
-
-            if (prepend) {
-                const insertBefore = loadMoreBtn.nextElementSibling;
-                if (dateString && insertBefore) {
-                    const topDate = getNodeDate(insertBefore);
-                    if (topDate && topDate !== dateString) {
-                        messagesBox.insertBefore(createDateDivider(dateString), insertBefore);
-                    }
-                } else if (dateString && !insertBefore) {
-                    messagesBox.insertBefore(createDateDivider(dateString), null);
-                }
-                messagesBox.insertBefore(msgNode, loadMoreBtn.nextElementSibling);
-            } else {
-                if (dateString && dateString !== lastAppendedDateString) {
-                    messagesBox.appendChild(createDateDivider(dateString));
-                    lastAppendedDateString = dateString;
-                }
-                messagesBox.appendChild(msgNode);
-            }
-        }
-
-        function cacheEntryFromMessage(id, data) {
-            return {
-                id,
-                name: data.name || '',
-                text: data.text || '',
-                isSystem: !!data.isSystem
-            };
-        }
-
-        function elementIdForMessage(id, data) {
-            return data.isSystem ? `sys-${id}` : `msg-${id}`;
-        }
+        const COOLDOWN_TIME = 1500;
+        const STATIC_MIRRORS = ['https://pleskachavkz-hue.github.io/freedom/'];
 
         function getOldestTimestamp(messages) {
-            const timestamps = messages
-                .map(m => m.data.timestamp)
-                .filter(t => typeof t === 'number');
+            const timestamps = messages.map(m => m.timestamp).filter(t => typeof t === 'number');
             return timestamps.length ? Math.min(...timestamps) : null;
         }
 
-        function clearMessagesUI() {
-            Array.from(messagesBox.children).forEach(child => {
-                if (child !== loadMoreBtn) child.remove();
-            });
-            localMessagesCache = [];
-            oldestLoadedTimestamp = null;
-            lastAppendedDateString = '';
-            lastKnownMessageKey = null;
-            loadMoreBtn.style.display = 'none';
-            stopLiveListening();
-        }
+        Alpine.data('chatApp', () => ({
+            username: localStorage.getItem('chat_username') || '',
+            adminSessionToken: sessionStorage.getItem('admin_session_token') || '',
+            usernameInput: '',
+            messageInput: '',
+            searchQuery: '',
+            mirrorLinksHTML: '',
+            onlineCount: 0,
+            typingUsers: {},
+            messages: [],
+            showLoadMore: false,
 
-        function stopLiveListening() {
-            if (liveQuery) {
-                liveQuery.off('child_added', onNewMessage);
-                liveQuery = null;
-            }
-        }
+            oldestLoadedTimestamp: null,
+            lastKnownMessageKey: null,
+            lastMessageSentTime: 0,
+            typingTimeout: null,
+            liveUnsubscribe: null,
+            initialLoadDone: false,
+            chatEngineStarted: false,
+            isPrependingHistory: false,
+            unsubscribes: [],
 
-        function onNewMessage(snapshot) {
-            const messageId = snapshot.key;
-            const data = snapshot.val();
-            const elementId = elementIdForMessage(messageId, data);
+            init() {
+                localStorage.removeItem('chat_is_admin');
+                this.renderMirrorLinks();
 
-            if (document.getElementById(elementId)) return;
-
-            addToCache(cacheEntryFromMessage(elementId, data), false);
-            lastKnownMessageKey = messageId;
-
-            if (!data.isSystem && data.name !== username && (!data.views || !data.views[username])) {
-                db.child(messageId).child('views').child(username).set(true);
-            }
-
-            renderMessage(elementId, data, false);
-
-            if (!searchInput.value.trim()) {
-                messagesBox.scrollTop = messagesBox.scrollHeight;
-            }
-        }
-
-        function onMessageChanged(snapshot) {
-            const messageId = snapshot.key;
-            const data = snapshot.val();
-            if (data.isSystem) return;
-
-            const msgElement = document.getElementById(`msg-${messageId}`);
-            if (!msgElement || data.name !== username) return;
-
-            const viewsCount = data.views ? Object.keys(data.views).length : 1;
-            const ticks = viewsCount > 1 ? '✓✓' : '✓';
-            const ticksSpan = msgElement.querySelector('.ticks');
-            if (ticksSpan) ticksSpan.innerText = ticks;
-        }
-
-        function startLiveListening(afterKey) {
-            if (liveQuery) return;
-            liveQuery = afterKey ? db.orderByKey().startAfter(afterKey) : db;
-            liveQuery.on('child_added', onNewMessage);
-        }
-
-        function applySearchFilter() {
-            const query = searchInput.value.toLowerCase().trim();
-            const showAll = !query;
-
-            localMessagesCache.forEach(item => {
-                const element = document.getElementById(item.id);
-                if (!element) return;
-                if (showAll) {
-                    element.style.display = '';
-                    return;
+                if (this.username) {
+                    this.startChatEngine();
                 }
-                const matches = item.isSystem
-                    ? item.text.toLowerCase().includes(query)
-                    : item.text.toLowerCase().includes(query) || item.name.toLowerCase().includes(query);
-                element.style.display = matches ? '' : 'none';
-            });
 
-            messagesBox.querySelectorAll('.date-divider').forEach(divider => {
-                if (showAll) {
-                    divider.style.display = '';
-                    return;
-                }
-                const next = divider.nextElementSibling;
-                divider.style.display = next && next.style.display !== 'none' ? '' : 'none';
-            });
-        }
-
-        function checkAuth() {
-            if (!username) {
-                authOverlay.style.display = 'flex';
-                searchBar.style.display = 'none';
-                adminPanelBtn.style.display = 'none';
-                return;
-            }
-
-            authOverlay.style.display = 'none';
-            searchBar.style.display = 'block';
-            currentUserDisplay.innerText = username + (isAdminUser() ? ' (Админ)' : '');
-            adminPanelBtn.style.display = isAdminUser() ? 'block' : 'none';
-
-            if (chatInitialized) return;
-            chatInitialized = true;
-            initChatListeners();
-            initOnlinePresence();
-            loadInitialMessages();
-        }
-
-        function sendSystemMessage(text) {
-            db.push({
-                name: 'Система',
-                text: text,
-                timestamp: firebase.database.ServerValue.TIMESTAMP,
-                isSystem: true
-            });
-        }
-
-        async function handleLogin() {
-            const name = usernameInput.value.trim();
-            if (!name) return;
-
-            if (name === ADMIN_SECRET_CODE) {
-                adminSessionToken = await computeAdminToken();
-                sessionStorage.setItem('admin_session_token', adminSessionToken);
-                username = 'Admin';
-            } else {
-                adminSessionToken = null;
-                sessionStorage.removeItem('admin_session_token');
-                username = name;
-            }
-
-            localStorage.setItem('chat_username', username);
-            checkAuth();
-            sendSystemMessage(`Пользователь ${username} вошел в чат`);
-        }
-
-        loginButton.addEventListener('click', handleLogin);
-        usernameInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleLogin(); });
-
-        logoutButton.addEventListener('click', () => {
-            if (username) {
-                typingRef.child(username).set(false);
-                onlineRef.child(username).remove();
-                sendSystemMessage(`Пользователь ${username} покинул чат`);
-            }
-            amOnlineRef.off();
-            onlineRef.off();
-            typingRef.off();
-            db.off();
-            localStorage.removeItem('chat_username');
-            sessionStorage.removeItem('admin_session_token');
-            setTimeout(() => { location.reload(); }, 300);
-        });
-
-        adminPanelBtn.addEventListener('click', async () => {
-            if (!isAdminUser()) return;
-
-            const action = prompt('Введите команду:\n1 - Очистить историю чата\n2 - Сбросить онлайн счетчики');
-            if (action === '1') {
-                const secret = prompt('Подтвердите код администратора:');
-                if (secret !== ADMIN_SECRET_CODE) {
-                    alert('Неверный код');
-                    return;
-                }
-                if (confirm('Вы уверены, что хотите полностью удалить историю сообщений?')) {
-                    clearChatHistory().then(() => {
-                        sendSystemMessage('Администратор очистил историю чата');
-                    }).catch((error) => {
-                        alert('Ошибка при очистке: ' + error.message);
+                this.$watch('messages', () => {
+                    if (this.isPrependingHistory) return;
+                    this.$nextTick(() => {
+                        if (!this.searchQuery.trim()) {
+                            const box = document.getElementById('messages');
+                            if (box) box.scrollTop = box.scrollHeight;
+                        }
                     });
+                });
+            },
+
+            get isAdmin() {
+                return this.adminSessionToken === ADMIN_HASH_EXPECTED;
+            },
+
+            get filteredMessages() {
+                let list = this.messages;
+                const queryText = this.searchQuery.toLowerCase().trim();
+
+                if (queryText) {
+                    list = list.filter(m => m.isSystem
+                        ? m.text.toLowerCase().includes(queryText)
+                        : m.text.toLowerCase().includes(queryText) || m.name.toLowerCase().includes(queryText)
+                    );
                 }
-            } else if (action === '2') {
-                const secret = prompt('Подтвердите код администратора:');
-                if (secret !== ADMIN_SECRET_CODE) {
-                    alert('Неверный код');
-                    return;
+
+                const processed = [];
+                let lastDate = '';
+                const todayStr = new Date().toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+
+                list.forEach(m => {
+                    if (typeof m.timestamp === 'number') {
+                        const dStr = new Date(m.timestamp).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+                        if (dStr !== lastDate) {
+                            processed.push({
+                                id: 'div-' + m.id,
+                                isDivider: true,
+                                text: dStr === todayStr ? 'Сегодня' : dStr
+                            });
+                            lastDate = dStr;
+                        }
+                    }
+                    processed.push(m);
+                });
+
+                return processed;
+            },
+
+            get typingStatusText() {
+                const active = Object.keys(this.typingUsers).filter(u => u !== this.username && this.typingUsers[u] === true);
+                if (active.length === 0) return '';
+                return active.length === 1 ? `${active[0]} печатает...` : `${active.length} чел. печатают...`;
+            },
+
+            addUnsubscribe(unsub) {
+                this.unsubscribes.push(unsub);
+            },
+
+            stopLiveListening() {
+                if (this.liveUnsubscribe) {
+                    this.liveUnsubscribe();
+                    this.liveUnsubscribe = null;
                 }
-                onlineRef.remove();
-                typingRef.remove();
-                alert('Счетчики сброшены');
-            }
-        });
+            },
 
-        function sendMessage() {
-            const text = messageInput.value.trim();
-            if (!text || !username) return;
+            resetChatState() {
+                this.messages = [];
+                this.oldestLoadedTimestamp = null;
+                this.lastKnownMessageKey = null;
+                this.showLoadMore = false;
+                this.stopLiveListening();
+            },
 
-            db.push({
-                name: username,
-                text: text,
-                timestamp: firebase.database.ServerValue.TIMESTAMP,
-                views: { [username]: true }
-            });
-            messageInput.value = '';
-            clearTimeout(typingTimeout);
-            typingRef.child(username).set(false);
-        }
-
-        sendButton.addEventListener('click', sendMessage);
-        messageInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') sendMessage(); });
-
-        messageInput.addEventListener('input', () => {
-            if (!username) return;
-            typingRef.child(username).set(true);
-            clearTimeout(typingTimeout);
-            typingTimeout = setTimeout(() => {
-                typingRef.child(username).set(false);
-            }, 2500);
-        });
-
-        function initOnlinePresence() {
-            amOnlineRef.on('value', (snapshot) => {
-                if (snapshot.val() === true) {
-                    const userStatusRef = onlineRef.child(username);
-                    userStatusRef.onDisconnect().remove();
-                    userStatusRef.set(true);
+            trimMessagesCache() {
+                if (this.messages.length > MAX_CACHE_SIZE) {
+                    this.messages = this.messages.slice(this.messages.length - MAX_CACHE_SIZE);
+                    this.oldestLoadedTimestamp = getOldestTimestamp(this.messages);
                 }
-            });
-            onlineRef.on('value', (snapshot) => {
-                onlineCountSpan.innerText = `онлайн: ${snapshot.numChildren() || 0}`;
-            });
-        }
+            },
 
-        searchInput.addEventListener('input', applySearchFilter);
+            startChatEngine() {
+                if (this.chatEngineStarted) return;
+                this.chatEngineStarted = true;
+                this.initOnlinePresence();
+                this.initChatListeners();
+                this.loadInitialMessages();
+            },
 
-        function initChatListeners() {
-            typingRef.on('value', (snapshot) => {
-                const typingUsers = snapshot.val() || {};
-                const activeTypers = Object.keys(typingUsers).filter(name => name !== username && typingUsers[name] === true);
-                const typingStatusDiv = document.getElementById('typing-status');
-                if (activeTypers.length > 0) {
-                    typingStatusDiv.innerText = activeTypers.length === 1
-                        ? `${activeTypers[0]} печатает...`
-                        : `${activeTypers.join(', ')} печатают...`;
+            async handleLogin() {
+                const name = this.usernameInput.trim();
+                if (!name) return;
+
+                const msgBuffer = new TextEncoder().encode(name + ADMIN_TOKEN_SALT);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+                const inputHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+                if (inputHash === ADMIN_HASH_EXPECTED) {
+                    this.adminSessionToken = inputHash;
+                    sessionStorage.setItem('admin_session_token', inputHash);
+                    this.username = 'Admin';
                 } else {
-                    typingStatusDiv.innerText = '';
-                }
-            });
-
-            db.on('child_changed', onMessageChanged);
-
-            db.on('value', (snapshot) => {
-                if (!snapshot.exists()) {
-                    clearMessagesUI();
-                    if (initialLoadDone) {
-                        startLiveListening(null);
-                    }
-                }
-            });
-        }
-
-        function loadInitialMessages() {
-            db.limitToLast(MESSAGES_LIMIT).once('value', (snapshot) => {
-                const messages = [];
-                snapshot.forEach(child => {
-                    messages.push({ id: child.key, data: child.val() });
-                });
-
-                oldestLoadedTimestamp = getOldestTimestamp(messages);
-                loadMoreBtn.style.display = messages.length === MESSAGES_LIMIT ? 'block' : 'none';
-
-                messages.forEach(item => {
-                    const elementId = elementIdForMessage(item.id, item.data);
-                    addToCache(cacheEntryFromMessage(elementId, item.data), false);
-                    renderMessage(elementId, item.data, false);
-
-                    if (!item.data.isSystem && item.data.name !== username && (!item.data.views || !item.data.views[username])) {
-                        db.child(item.id).child('views').child(username).set(true);
-                    }
-                });
-
-                if (messages.length > 0) {
-                    lastKnownMessageKey = messages[messages.length - 1].id;
+                    if (name.toLowerCase() === 'admin') return alert('Имя "Admin" зарезервировано!');
+                    this.adminSessionToken = '';
+                    sessionStorage.removeItem('admin_session_token');
+                    this.username = name;
                 }
 
-                messagesBox.scrollTop = messagesBox.scrollHeight;
-                stopLiveListening();
-                startLiveListening(lastKnownMessageKey);
-                initialLoadDone = true;
-            });
-        }
+                localStorage.setItem('chat_username', this.username);
+                this.startChatEngine();
+                this.sendSystemMessage(`Пользователь ${this.username} вошел в чат`);
+            },
 
-        function handleLoadMore() {
-            if (typeof oldestLoadedTimestamp !== 'number') return;
+            handleLogout() {
+                if (this.username) {
+                    set(ref(database, `typing/${this.username}`), null);
+                    remove(ref(database, `online_users/${this.username}`));
+                    this.sendSystemMessage(`Пользователь ${this.username} покинул чат`);
+                }
+                this.unsubscribes.forEach(unsub => unsub());
+                this.stopLiveListening();
+                localStorage.removeItem('chat_username');
+                sessionStorage.removeItem('admin_session_token');
+                location.reload();
+            },
 
-            const prevScrollHeight = messagesBox.scrollHeight;
-            const prevScrollTop = messagesBox.scrollTop;
-
-            db.orderByChild('timestamp')
-                .endAt(oldestLoadedTimestamp - 1)
-                .limitToLast(MESSAGES_LIMIT)
-                .once('value', (snapshot) => {
-                    const messages = [];
+            loadInitialMessages() {
+                const initialQuery = query(dbRef, limitToLast(MESSAGES_LIMIT));
+                onValue(initialQuery, (snapshot) => {
+                    const rawMessages = [];
                     snapshot.forEach(child => {
-                        messages.push({ id: child.key, data: child.val() });
+                        rawMessages.push({ id: child.key, ...child.val() });
                     });
 
-                    if (messages.length === 0) {
-                        loadMoreBtn.style.display = 'none';
+                    this.messages = rawMessages;
+
+                    if (rawMessages.length === 0) {
+                        this.initialLoadDone = true;
+                        this.startLiveListening(null);
                         return;
                     }
 
-                    oldestLoadedTimestamp = getOldestTimestamp(messages);
-                    if (messages.length < MESSAGES_LIMIT || typeof oldestLoadedTimestamp !== 'number') {
-                        loadMoreBtn.style.display = 'none';
+                    this.oldestLoadedTimestamp = getOldestTimestamp(rawMessages);
+                    this.lastKnownMessageKey = rawMessages[rawMessages.length - 1].id;
+                    this.showLoadMore = rawMessages.length === MESSAGES_LIMIT;
+
+                    rawMessages.forEach(msg => this.markAsRead(msg.id, msg));
+
+                    this.initialLoadDone = true;
+                    this.startLiveListening(this.lastKnownMessageKey);
+                }, { onlyOnce: true });
+            },
+
+            startLiveListening(afterKey) {
+                this.stopLiveListening();
+                const liveQuery = afterKey ? query(dbRef, orderByKey(), startAfter(afterKey)) : dbRef;
+
+                this.liveUnsubscribe = onChildAdded(liveQuery, (snapshot) => {
+                    if (!this.initialLoadDone) return;
+
+                    const key = snapshot.key;
+                    const val = snapshot.val();
+                    if (this.messages.some(m => m.id === key)) return;
+
+                    this.messages.push({ id: key, ...val });
+                    this.lastKnownMessageKey = key;
+                    this.trimMessagesCache();
+                    this.markAsRead(key, val);
+                });
+            },
+
+            handleLoadMore() {
+                if (typeof this.oldestLoadedTimestamp !== 'number') return;
+
+                const box = document.getElementById('messages');
+                const prevScrollHeight = box.scrollHeight;
+                const prevScrollTop = box.scrollTop;
+
+                const historyQuery = query(
+                    dbRef,
+                    orderByChild('timestamp'),
+                    endAt(this.oldestLoadedTimestamp - 1),
+                    limitToLast(MESSAGES_LIMIT)
+                );
+
+                onValue(historyQuery, (snapshot) => {
+                    const oldMessages = [];
+                    snapshot.forEach(child => {
+                        oldMessages.push({ id: child.key, ...child.val() });
+                    });
+
+                    if (oldMessages.length === 0) {
+                        this.showLoadMore = false;
+                        return;
                     }
 
-                    messages.forEach(item => {
-                        const elementId = elementIdForMessage(item.id, item.data);
-                        addToCache(cacheEntryFromMessage(elementId, item.data), true);
-                        renderMessage(elementId, item.data, true);
-                    });
+                    this.oldestLoadedTimestamp = getOldestTimestamp(oldMessages);
+                    if (oldMessages.length < MESSAGES_LIMIT || typeof this.oldestLoadedTimestamp !== 'number') {
+                        this.showLoadMore = false;
+                    }
 
-                    requestAnimationFrame(() => {
-                        messagesBox.scrollTop = prevScrollTop + (messagesBox.scrollHeight - prevScrollHeight);
-                    });
+                    this.isPrependingHistory = true;
+                    this.messages.unshift(...oldMessages);
+                    this.trimMessagesCache();
 
-                    applySearchFilter();
+                    this.$nextTick(() => {
+                        box.scrollTop = prevScrollTop + (box.scrollHeight - prevScrollHeight);
+                        this.isPrependingHistory = false;
+                    });
+                }, { onlyOnce: true });
+            },
+
+            sendMessage() {
+                const text = this.messageInput.trim();
+                if (!text || !this.username) return;
+
+                const now = Date.now();
+                if (now - this.lastMessageSentTime < COOLDOWN_TIME) {
+                    alert(`Подождите еще ${((COOLDOWN_TIME - (now - this.lastMessageSentTime)) / 1000).toFixed(1)} сек.`);
+                    return;
+                }
+                this.lastMessageSentTime = now;
+
+                const newMsgRef = push(dbRef);
+                set(newMsgRef, {
+                    name: this.username,
+                    text: text,
+                    timestamp: serverTimestamp(),
+                    views: { [this.username]: true }
                 });
-        }
 
-        loadMoreBtn.addEventListener('click', handleLoadMore);
+                this.messageInput = '';
+                set(ref(database, `typing/${this.username}`), null);
+            },
 
-        renderMirrorLinks();
+            handleTyping() {
+                if (!this.username || this.username === 'Admin') return;
+                set(ref(database, `typing/${this.username}`), true);
+                clearTimeout(this.typingTimeout);
+                this.typingTimeout = setTimeout(() => {
+                    set(ref(database, `typing/${this.username}`), null);
+                }, 2500);
+            },
 
-        computeAdminToken().then(token => {
-            expectedAdminToken = token;
-            if (adminSessionToken && adminSessionToken !== expectedAdminToken) {
-                adminSessionToken = null;
-                sessionStorage.removeItem('admin_session_token');
+            markAsRead(key, msgVal) {
+                if (msgVal.isSystem || msgVal.name === this.username) return;
+                if (msgVal.views && msgVal.views[this.username]) return;
+                set(ref(database, `chat_messages/${key}/views/${this.username}`), true);
+            },
+
+            sendSystemMessage(text) {
+                const newSysRef = push(dbRef);
+                set(newSysRef, {
+                    name: 'Система',
+                    text: text,
+                    timestamp: serverTimestamp(),
+                    isSystem: true
+                });
+            },
+
+            async clearChatHistory() {
+                const snapshot = await get(dbRef);
+                if (!snapshot.exists()) return;
+                const updates = {};
+                snapshot.forEach(child => { updates[child.key] = null; });
+                await update(dbRef, updates);
+            },
+
+            initOnlinePresence() {
+                if (this.username === 'Admin') return;
+                this.addUnsubscribe(onValue(connectedRef, (snapshot) => {
+                    if (snapshot.val() === true) {
+                        const myStatusRef = ref(database, `online_users/${this.username}`);
+                        onDisconnect(myStatusRef).remove();
+                        set(myStatusRef, true);
+                    }
+                }));
+            },
+
+            initChatListeners() {
+                this.addUnsubscribe(onValue(onlineRef, (snapshot) => {
+                    this.onlineCount = snapshot.numChildren() || 0;
+                }));
+
+                this.addUnsubscribe(onValue(typingRef, (snapshot) => {
+                    this.typingUsers = snapshot.val() || {};
+                }));
+
+                this.addUnsubscribe(onChildChanged(dbRef, (snapshot) => {
+                    const key = snapshot.key;
+                    const val = snapshot.val();
+                    const idx = this.messages.findIndex(m => m.id === key);
+                    if (idx !== -1) {
+                        this.messages.splice(idx, 1, { ...this.messages[idx], views: val.views });
+                    }
+                }));
+
+                this.addUnsubscribe(onValue(dbRef, (snapshot) => {
+                    if (!snapshot.exists() && this.initialLoadDone) {
+                        this.resetChatState();
+                        this.startLiveListening(null);
+                    }
+                }));
+            },
+
+            async handleAdminAction() {
+                if (!this.isAdmin) return;
+                const action = prompt('Введите команду:\n1 - Очистить чат\n2 - Сбросить счетчики онлайна');
+
+                if (action === '1') {
+                    const code = prompt('Подтвердите пароль:');
+                    const msgBuffer = new TextEncoder().encode((code || '') + ADMIN_TOKEN_SALT);
+                    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+                    const confirmHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+                    if (confirmHash !== ADMIN_HASH_EXPECTED) return alert('Неверный код!');
+                    if (!confirm('Удалить ВСЕ сообщения?')) return;
+
+                    try {
+                        await this.clearChatHistory();
+                        this.sendSystemMessage('Администратор очистил историю чата');
+                    } catch (error) {
+                        alert('Ошибка при очистке: ' + error.message);
+                    }
+                } else if (action === '2') {
+                    const code = prompt('Подтвердите пароль:');
+                    const msgBuffer = new TextEncoder().encode((code || '') + ADMIN_TOKEN_SALT);
+                    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+                    const confirmHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+                    if (confirmHash !== ADMIN_HASH_EXPECTED) return alert('Неверный код!');
+                    set(onlineRef, null);
+                    set(typingRef, null);
+                    alert('Счетчики сброшены');
+                }
+            },
+
+            formatTime(ts) {
+                if (!ts) return '';
+                return new Date(ts).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+            },
+
+            renderMirrorLinks() {
+                const current = window.location.href.split('?')[0].split('#')[0];
+                const mirrors = STATIC_MIRRORS.filter(url => url && url.split('?')[0] !== current);
+                if (mirrors.length === 0) {
+                    this.mirrorLinksHTML = '';
+                    return;
+                }
+                this.mirrorLinksHTML = 'Если сайт не открывается, попробуйте зеркало: ' +
+                    mirrors.map((url, i) => `<a href="${url}" target="_blank" rel="noopener">#${i + 1}</a>`).join(' · ');
             }
-            checkAuth();
-        });
+        }));
+
+        Alpine.start();
     </script>
 </body>
 </html>
